@@ -1,4 +1,6 @@
 {
-    "name": "Lovelace FullCalendar Card",
-    "render_readme": true
+  "name": "Lovelace FullCalendar Card",
+  "filename": "lovelace-fullcalendar-card.js",
+  "content_in_root": true,
+  "homeassistant": "2026.1.0"
 }

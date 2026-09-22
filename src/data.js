@@ -1,152 +1,50 @@
-var moment = require("moment");
-import "./locale.js";
+function eventDate(value) {
+  return value?.date ?? value?.dateTime ?? value;
+}
+const isDateOnly = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-const eventAllDay = function(event){
-   		var allDay = false;
-   		if(event.start.date){
-				allDay = true;
-		}
-		else if(event.start.dateTime){
-			allDay = false;	
-		}
-		else{
-			let start = moment(event.start);
-			let end = moment(event.end);
-			let diffInHours = end.diff(start, 'hours');
-			allDay = (diffInHours >= 24);
-		}
-		
-		return allDay;
-};
-
-const eventTimeString = function(event, language){
-	moment.locale(language);
-	
-	let startDateTime = moment(new Date(event.start));
-	let endDateTime = event.end ? moment(new Date(event.end)) : moment(new Date(event.start)).add(1, 'days');
-	
-	let eventTime = "";
-	if(event.allDay){
-		endDateTime = endDateTime.startOf('day').add(-1, 'hours');
-		if(startDateTime.clone().startOf('day').isSame(endDateTime.clone().startOf('day'))) // One day event
-		{
-			eventTime = `${startDateTime.format("dddd, D MMMM")}`;
-		}
-		else if(startDateTime.month() == endDateTime.month()){
-			eventTime = `${startDateTime.format("D")} - ${endDateTime.format("D MMMM YYYY")}`;
-		}
-		else if(startDateTime.year() == endDateTime.year())
-		{
-			eventTime = `${startDateTime.format("D MMMM")} - ${endDateTime.format("D MMMM YYYY")}`;
-		}
-		else {
-			eventTime = `${startDateTime.format("D MMMM YYYY")} - ${endDateTime.format("D MMMM YYYY")}`;
-		}
-	}
-	else
-	{
-		if(startDateTime.clone().startOf('day').isSame(endDateTime.clone().startOf('day'))) // Start and end same day
-		{
-			if(startDateTime.format("a") == endDateTime.format("a"))
-			{
-				eventTime = `${startDateTime.format("dddd, D MMMM")}  ⋅ ${startDateTime.format("h:mm")} - ${endDateTime.format("h:mm a")}`;
-			}
-			else{
-				eventTime = `${startDateTime.format("dddd, D MMMM")}  ⋅ ${startDateTime.format("h:mm a")} - ${endDateTime.format("h:mm a")}`;
-			}		
-		}
-		else
-		{
-			eventTime = `${startDateTime.format("D MMMM YYYY, h:mm a")} - ${endDateTime.format("D MMMM YYYY, h:mm a")}`;
-		}
-	}
-	
-	return eventTime;
+export function calendarName(hass, config) {
+  return config.name || hass.states?.[config.entity]?.attributes?.friendly_name || config.entity;
 }
 
-class CalendarEvent {
-	
-	static FromEventData(hass, eventData){
-		var event = new CalendarEvent();
-		
-		event.title = eventData.summary ? eventData.summary : eventData.title; 
-        event.start = eventData.start.date ? eventData.start.date : eventData.start.dateTime ? eventData.start.dateTime : eventData.start;
-        event.end = eventData.end.date ? eventData.end.date : eventData.end.dateTime ? eventData.end.dateTime : eventData.end;
-        event.allDay = eventAllDay(eventData);
-        event.displayTime = eventTimeString(event, hass.language); 
-        return event;
-	}
-	
-	static FromEntity(hass, entityConf, stateObj){
-		var event = new CalendarEvent();
-		
-		event.title = ((entityConf.name) ? entityConf.name : stateObj.attributes.friendly_name) ;
-        
-        if(stateObj.attributes.device_class === "timestamp"){
-    		event.start = stateObj.state;
-    	}
-    	else{
-    		let domain = stateObj.entity_id.split('.')[0];
-    		event.start = (stateObj.attributes.last_changed ? stateObj.attributes.last_changed : stateObj.last_changed);				
-    	}
-        event.allDay = true;
-        event.displayTime = eventTimeString(event, hass.language);
-        return event;
-	}
+export function calendarEvent(data, name) {
+  const start = eventDate(data.start);
+  const end = eventDate(data.end);
+  return {
+    title: data.summary ?? data.title ?? "",
+    start,
+    ...(end ? { end } : {}),
+    // Duration does not determine all-day status: a 48-hour timed event is still timed.
+    allDay: isDateOnly(start),
+    extendedProps: {
+      calendarName: name,
+      description: data.description ?? "",
+      location: data.location ?? "",
+    },
+  };
 }
 
 export class CalendarService {
-	constructor() {
-		this.eventData = {};
-	}
-	
-	
-	async getEvents(hass, entityConf, start, end){
-  		if(!hass) return [];
-  		
-  		var entity = entityConf.entity;
-  		var domain = entity.split('.')[0];
-  		if(domain == 'calendar'){
-  			return this.getCalendarEvents(hass, entity, start, end);
-  		}
-  		else{
-  			return this.getEntityEvents(hass, entityConf);
-  		}
-  	}
-  	
-  	async getEntityEvents(hass, entityConf){
-  		var stateObj = hass.states[entityConf.entity];
-  		if(!entityConf.time_list_attribute){
-  			return [CalendarEvent.FromEntity(hass, entityConf, stateObj)];
-  		}
-  		else{
-  			var event = CalendarEvent.FromEntity(hass, entityConf, stateObj);
-  			var time_list = stateObj.attributes[entityConf.time_list_attribute];
-  			if(time_list){
-  				return time_list.map(time => { return {...event, start:time} });
-  			}
-  			else return [event];
-  		}
-  	}
-  	
-	async getCalendarEvents(hass, calendar, start, end){
-  		let startStr = start.toISOString();
-  		let endStr = end.toISOString();
-  		
-  		let url = `calendars/${calendar}?start=${startStr}&end=${endStr}`;
-        let result = await hass.callApi('get', url);
-        var events = result.map(x => CalendarEvent.FromEventData(hass, x));
-        
-        let oldEvents = this.eventData[calendar] || [];
-        oldEvents.push(...events);
-        
-        this.eventData[calendar] = oldEvents.filter((thing, index) => {
-  			const _thing = JSON.stringify(thing);
-  			return index === oldEvents.findIndex(obj => {
-    			return JSON.stringify(obj) === _thing;
-  			});
-		});
-		
-        return this.eventData[calendar];
-  	}
+  async getEvents(hass, config, start, end) {
+    if (!hass) return [];
+    const name = calendarName(hass, config);
+    if (config.entity.startsWith("calendar.")) {
+      const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
+      const data = await hass.callApi("get", `calendars/${encodeURIComponent(config.entity)}?${params}`);
+      // Return this range's fresh response. Appending old responses leaves deleted events behind.
+      return data.map((event) => calendarEvent(event, name));
+    }
+    const state = hass.states?.[config.entity];
+    if (!state) return [];
+    const attributes = state.attributes ?? {};
+    const startDate = attributes.device_class === "timestamp"
+      ? state.state : (attributes.last_changed ?? state.last_changed);
+    const dates = config.time_list_attribute && Array.isArray(attributes[config.time_list_attribute])
+      ? attributes[config.time_list_attribute] : [startDate];
+    return dates.filter((date) => typeof date === "string" && !Number.isNaN(Date.parse(date)))
+      .map((date) => ({
+        title: name, start: date, allDay: true,
+        extendedProps: { calendarName: name },
+      }));
+  }
 }

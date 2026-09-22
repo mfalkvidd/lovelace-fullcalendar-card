@@ -1,37 +1,31 @@
 {
-  "name": "lovelace-full-calendar-card",
+  "name": "lovelace-fullcalendar-card",
   "private": true,
-  "version": "0.0.1",
-  "description": "Lovelace Full Calendar",
+  "version": "0.1.0",
+  "description": "A Home Assistant calendar card for family dashboards",
+  "type": "module",
   "scripts": {
-    "build": "webpack",
-    "watch": "webpack --watch --mode=development"
+    "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
+    "test": "node --test tests/unit/*.test.js",
+    "test:browser": "playwright test",
+    "check": "npm test && npm run build && npm run test:browser"
   },
+  "engines": { "node": ">=22" },
   "repository": {
     "type": "git",
-    "url": "github.com:gadgetchnnel/lovelace-full-calendar"
+    "url": "https://github.com/gadgetchnnel/lovelace-fullcalendar-card"
   },
   "author": "Steven Rollason",
   "license": "MIT",
   "devDependencies": {
-    "css-loader": "^6.8.1",
-    "lit-css-loader": "0.0.4",
-    "style-loader": "^1.1.4",
-    "to-string-loader": "^1.1.6",
-    "webpack": "^4.41.2",
-    "webpack-cli": "^3.3.10"
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2"
   },
-  "main": "webpack.config.js",
   "dependencies": {
-    "@fullcalendar/common": "5.1.0",
-    "@fullcalendar/core": "5.1.0",
-    "@fullcalendar/daygrid": "5.1.0",
-    "@fullcalendar/interaction": "5.1.0",
-    "@fullcalendar/list": "5.1.0",
-    "custom-card-helpers": "^1.9.0",
-    "lit-element": "^2.3.1",
-    "moment": "^2.29.4",
-    "tippy.js": "^6.2.2"
-  },
-  "keywords": []
+    "fullcalendar": "7.1.0",
+    "lit": "3.3.3",
+    "temporal-polyfill": "1.0.1",
+    "weekstart": "2.0.0"
+  }
 }

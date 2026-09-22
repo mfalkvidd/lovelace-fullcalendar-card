@@ -1,0 +1,33 @@
+title: Family calendar
+views:
+  - title: Calendar
+    path: calendar
+    type: panel
+    cards:
+      - type: custom:fullcalendar-card
+        initialView: dayGridMonth
+        views: [dayGridDay, dayGridWeek, dayGridMonth, multiMonthTwo]
+        firstDay: 1
+        hour12: false
+        fillHeight: true
+        entities:
+          - entity: calendar.person_1
+            name: Person 1
+            eventColor: '#4A90E2'
+          - entity: calendar.person_2
+            name: Person 2
+            eventColor: '#E27D4A'
+          - entity: calendar.person_3
+            name: Person 3
+            eventColor: '#72B572'
+          - entity: calendar.person_4
+            name: Person 4
+            eventColor: '#B77AC4'
+  - title: Normal card
+    path: normal
+    type: masonry
+    cards:
+      - type: custom:fullcalendar-card
+        entities:
+          - entity: calendar.person_1
+            eventColor: green

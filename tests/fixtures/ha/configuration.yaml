@@ -1,0 +1,22 @@
+homeassistant:
+  name: Calendar browser tests
+  latitude: 59.3
+  longitude: 18.1
+  elevation: 0
+  unit_system: metric
+  time_zone: Europe/Stockholm
+  country: SE
+http:
+  server_host: 0.0.0.0
+  server_port: 8124
+frontend:
+api:
+config:
+recorder:
+logger:
+  default: warning
+lovelace:
+  mode: yaml
+  resources:
+    - url: /local/lovelace-fullcalendar-card.js
+      type: module

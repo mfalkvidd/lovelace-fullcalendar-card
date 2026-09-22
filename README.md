@@ -1,18 +1,183 @@
-## Introduction
+# FullCalendar card for Home Assistant
 
-This is a custom Lovelace card which allows you to display a calendar of events from your calendars and other entities in Home Assistant, using the fullcalendar.io calendar library.
+A family calendar dashboard that combines Home Assistant calendar entities, including Google Calendar entities, into one calendar. Each calendar keeps its own color. Day, Week, Month, and an optional stacked two-month view retain their layout at every card width.
 
-### Configuration
+Targets **Home Assistant 2026.1 and later** with current Firefox and Chromium browsers. The source uses Lit 3, FullCalendar 7, and esbuild. The distributed JavaScript includes its dependencies and styles; no CDN is needed.
+
+## Installation
+
+### HACS
+
+1. Open HACS and search for **Lovelace FullCalendar Card**. If it is not listed, add `https://github.com/gadgetchnnel/lovelace-fullcalendar-card` under **Custom repositories**, choosing **Dashboard** as the type.
+2. Download the card and reload the browser.
+3. Check **Settings → Dashboards → Resources** (enable Advanced Mode in your profile if needed). The resource should be `/hacsfiles/lovelace-fullcalendar-card/lovelace-fullcalendar-card.js`, type **JavaScript module**. Add it only if HACS has not registered it.
+4. Add a Manual card using one of the configurations below.
+
+For dashboards whose resources are managed in YAML, add this to the `lovelace:` configuration:
 
 ```yaml
-type: 'custom:fullcalendar-card'
+resources:
+  - url: /hacsfiles/lovelace-fullcalendar-card/lovelace-fullcalendar-card.js
+    type: module
+```
+
+The root bundle and its filename are retained for [HACS Dashboard installation](https://www.hacs.xyz/docs/publish/plugin/).
+
+### Manual installation
+
+Copy `lovelace-fullcalendar-card.js` to `/config/www/` and register `/local/lovelace-fullcalendar-card.js` as a JavaScript module resource. Reload the browser after upgrades. Do not load both the manual and HACS resources.
+
+## Basic calendar
+
+```yaml
+type: custom:fullcalendar-card
 entities:
   - entity: calendar.home_calendar
     eventColor: green
-  - entity: calendar.work_calendar
+```
+
+Configure Google Calendar in Home Assistant first, then use its `calendar.*` entities here. The card reads HA's calendar API; it does not need Google credentials.
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `type` | Required by HA | `custom:fullcalendar-card` |
+| `entities` | Required | Non-empty array of entity IDs or entity objects (see below). |
+| `views` | `[dayGridDay, dayGridWeek, dayGridMonth]` | Available view types, in selector order. Supported: `dayGridDay`, `dayGridWeek`, `dayGridMonth`, `multiMonthTwo`, `list`. |
+| `initialView` | `dayGridMonth` | Initial view. If Month is absent from `views`, defaults to the first configured view. An explicit value must be in `views`. |
+| `firstDay` | `auto` | `0` Sunday, `1` Monday, `2` Tuesday, `3` Wednesday, `4` Thursday, `5` Friday, `6` Saturday, or `auto`. |
+| `displayEventEnd` | `true` | Show the end as well as the start of timed events. An event must have an end time. |
+| `hour12` | `auto` | `false` for 24-hour time, `true` for 12-hour time, or `auto`. |
+| `fillHeight` | `false` | Fill the height provided by the containing view. Intended for a Panel view. |
+| `theme` | Inherited HA theme | Optional name of a Home Assistant theme, including its active light/dark mode. |
+
+Automatic first weekday uses `hass.locale.first_weekday` when configured; otherwise it uses the HA language's locale week data, with a CLDR fallback for browsers without `Intl.Locale` week information. An explicit YAML weekday always wins, including `firstDay: 0`.
+
+Automatic time format follows HA's profile setting: explicit 12/24-hour preference, language preference, or browser system preference. The same choice applies to every view and event details. HA's local/server time-zone preference is also respected. Date labels follow the HA language; time-range punctuation follows locale conventions.
+
+Controls follow the HA language too, including live language changes. Standard labels use FullCalendar's bundled translations. Card-specific labels (such as Two months, Location, and calendar loading errors) support English and Swedish, with English as the fallback for other languages. Swedish (`sv`, including `sv-SE`) shows **Idag | Dag | Vecka | Månad | Två månader**, with **Plats** and **Stäng** in event details. No extra locale download or YAML setting is needed.
+
+Invalid values fail early with a configuration message; for example, `firstDay: 9`, `initialView: doesNotExist`, and `views: dayGridMonth` are invalid. Use real YAML booleans, not quoted strings.
+
+### Entity options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `entity` | Required | Calendar or other HA entity ID. A string entry is shorthand for this field. |
+| `name` | Entity friendly name, then ID | Calendar name in details; event title for non-calendar entities. |
+| `eventColor` | `#3788d8` | CSS color for this entity's events; quote hexadecimal colors in YAML. |
+| `time_list_attribute` | None | For non-calendar entities, an attribute containing an array of date/time strings. |
+
+Calendar event titles come from the events, not the entity's `name`. Calendar failures are shown in the card; other calendars can still load. Events refresh on navigation, relevant entity changes, and every minute while the page is visible. Upstream Google Calendar synchronization still depends on the HA integration.
+
+## Monday-first week and start/end times
+
+```yaml
+type: custom:fullcalendar-card
+initialView: dayGridWeek
+firstDay: 1
+hour12: false
+displayEventEnd: true
+entities:
+  - calendar.home_calendar
+```
+
+Week always means seven `dayGridWeek` columns, including on portrait displays. A timed event shows a range such as `14:30–16:00 Simskola`; all-day events show only their title. Details always include full start/end dates and times when available, even with `displayEventEnd: false`.
+
+## Multiple calendars in a full-height panel
+
+This is dashboard YAML. A Panel view contains one card:
+
+```yaml
+views:
+  - title: Calendar
+    path: calendar
+    type: panel
+    cards:
+      - type: custom:fullcalendar-card
+        initialView: dayGridMonth
+        views:
+          - dayGridDay
+          - dayGridWeek
+          - dayGridMonth
+          - multiMonthTwo
+        firstDay: 1
+        displayEventEnd: true
+        hour12: false
+        fillHeight: true
+        entities:
+          - entity: calendar.person_1
+            name: Person 1
+            eventColor: "#4A90E2"
+          - entity: calendar.person_2
+            name: Person 2
+            eventColor: "#E27D4A"
+          - entity: calendar.person_3
+            name: Person 3
+            eventColor: "#72B572"
+          - entity: calendar.person_4
+            name: Person 4
+            eventColor: "#B77AC4"
+```
+
+The card fills the available panel below HA's header. FullCalendar's container `ResizeObserver` responds to height changes, sidebar changes, and container resizing without changing the active view. Outside a Panel view, `fillHeight` needs a parent with an explicit height. Omit it for normal cards, which grow with their content.
+
+## Two-month view
+
+```yaml
+type: custom:fullcalendar-card
+initialView: multiMonthTwo
+views: [dayGridDay, dayGridWeek, dayGridMonth, multiMonthTwo]
+firstDay: auto
+hour12: auto
+entities:
+  - calendar.home_calendar
+  - calendar.work_calendar
+```
+
+Two complete consecutive months are stacked vertically. Previous/next moves by two months; Day, Week, and Month move by one day, week, and month respectively. Today returns to the current period. The two-month view can scroll vertically; each month retains enough height for readable text instead of shrinking both grids to fit a short card.
+
+## Non-calendar entities
+
+Existing timestamp and date-list entities remain supported:
+
+```yaml
+type: custom:fullcalendar-card
+entities:
   - entity: sensor.next_meeting
+    name: Next meeting
     eventColor: orange
   - entity: sensor.bin_collection
     eventColor: grey
     time_list_attribute: bin_dates
 ```
+
+A timestamp sensor uses its state as the date. Other entities use `attributes.last_changed`, falling back to the entity's `last_changed`. Date-list attributes create one event per valid date. These events remain all-day markers for compatibility; this is not a historical state query. Missing entities and unavailable timestamps produce no event.
+
+## Migration and limitations
+
+- Existing `entities`, `name`, `eventColor`, `time_list_attribute`, and `theme` configurations are preserved. The custom element and resource filename are unchanged.
+- Month remains the initial view. The default selector order is now **Day | Week | Month**. Resizing never selects another view. Add `list` explicitly if you want the optional seven-day list.
+- End times are now on by default; set `displayEventEnd: false` for start-only display. Automatic time formatting replaces the old forced 24-hour grid and inconsistent popup formatting.
+- Calendar all-day ends remain exclusive. For example, September 17 through an exclusive September 20 spans September 17–19. Long timed events are no longer incorrectly classified as all-day.
+- Tap/click an event for details, including calendar, date/time, description, and location. Escape or Close dismisses the dialog. Descriptions and locations are plain text, including any embedded HTML.
+- Narrow cards wrap event text. Normal cards show up to five events per day before a `+N more` popup; full-height and multi-month views use space-based overflow. Tap the overflow link to access every event for that day. Extremely narrow displays still require wrapping and overflow.
+- The calendar is read-only. Creating/editing events and a visual configuration editor are not included.
+- Old `card-mod` rules targeting FullCalendar 5 or the old popup may need updating. Modern browser features, including `ResizeObserver`, CSS container queries, and native dialogs, are required.
+
+## Development and validation
+
+Node.js 22 or later:
+
+```sh
+npm ci
+npm test
+npm run build
+npx playwright install chromium firefox
+npm run test:browser
+```
+
+`npm run watch` rebuilds on source changes. Always generate `lovelace-fullcalendar-card.js` from `src/`; never patch it manually. Keep the rebuilt root bundle with source changes. If publishing a GitHub release, attach that same bundle.
+
+See [tests/README.md](tests/README.md) for the repeatable HA 2026.1.3 integration setup, browser matrix, and limits of validation.

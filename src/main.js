@@ -1,650 +1,271 @@
-import { LitElement, html, css, unsafeCSS } from "lit-element";
-import { Calendar } from '@fullcalendar/core';
-import fullcalendarStyle from "@fullcalendar/common/main.css";
-import interactionPlugin from '@fullcalendar/interaction';
-import dayGridPlugin from "@fullcalendar/daygrid";
-import daygridStyle from "@fullcalendar/daygrid/main.css";
-import listPlugin from "@fullcalendar/list";
-import listStyle from "@fullcalendar/list/main.css";
-import tippy from 'tippy.js';
-import tippyStyle from 'tippy.js/dist/tippy.css';
-import tippyAnimationStyle from 'tippy.js/animations/scale-extreme.css';
-import tippyThemeStyle from './tippy-theme.css';
-import { CalendarService } from "./data.js";
-import { haStyle } from "./styles.js"
-import { mdiViewAgenda, mdiViewDay, mdiViewModule, mdiViewWeek } from "./icons.js";
-import { applyThemesOnElement } from 'custom-card-helpers';
-const viewButtons = [
-  { label: "Month View", value: "dayGridMonth", iconPath: mdiViewModule },
-  { label: "Week View", value: "dayGridWeek", iconPath: mdiViewWeek },
-  { label: "Day View", value: "dayGridDay", iconPath: mdiViewDay },
-  { label: "List View", value: "list", iconPath: mdiViewAgenda },
-];
+import { LitElement, html, nothing } from "lit";
+import { Calendar } from "fullcalendar";
+import dayGridPlugin from "fullcalendar/daygrid";
+import listPlugin from "fullcalendar/list";
+import multiMonthPlugin from "fullcalendar/multimonth";
+import classicTheme from "fullcalendar/themes/classic";
+import locales from "fullcalendar/locales-all";
+import { CalendarService, calendarName } from "./data.js";
+import { normalizeConfig } from "./config.js";
+import { resolvePreferences, eventTimeFormat, formatEventDetails } from "./format.js";
+import { getLabels } from "./localize.js";
+import { styles } from "./styles.js";
 
+const previousPath = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
+const nextPath = "M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z";
 
-const getListWeekRange = (currentDate) => {
-  const startDate = new Date(currentDate.valueOf());
-  const endDate = new Date(currentDate.valueOf());
+export class FullCalendarCard extends LitElement {
+  static properties = {
+    _config: { state: true },
+    _hass: { state: true },
+    _title: { state: true },
+    _activeView: { state: true },
+    _selectedEvent: { state: true },
+    _errors: { state: true },
+  };
+  static styles = styles;
 
-  endDate.setDate(endDate.getDate() + 7);
-
-  return { start: startDate, end: endDate };
-};
-
-class FullCalendarCard extends LitElement {
-
-    constructor() {
-    	super();
-    	this._activeView = "dayGridMonth";
-    	this.initialView = "dayGridMonth";
-    	this.views = [
-    		"dayGridMonth",
-    		"dayGridWeek",
-    		"dayGridDay",
-  		];
-    }
-    
-	setConfig(config) {
-		if(!config || !config.entities)
-			throw new Error("Invalid configuration");
-		this._config = config;
-		this.entities = this.processConfigEntities(this._config.entities);
-		this.calendarService = new CalendarService();
-	}
- 
-	static get styles() {
-    console.log("getting styles");
-    return [
-      haStyle,
-      css`
-        ${unsafeCSS(fullcalendarStyle)}
-      	${unsafeCSS(daygridStyle)}
-      	${unsafeCSS(listStyle)}
-      	${unsafeCSS(tippyStyle)}
-      	${unsafeCSS(tippyAnimationStyle)}
-      	${unsafeCSS(tippyThemeStyle)}
-      	
-        :host {
-          display: flex;
-          flex-direction: column;
-          --fc-theme-standard-border-color: var(--divider-color);
-        }
-        
-        :host([ispanel]) {
-    		height: calc(100% - 6em);
-        }
-        
-        :host([ispanel]) ha-card {
-        	height: calc(100% - 6em);
-        }
-        
-        .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-bottom: 8px;
-        }
-
-        :host([narrow]) .header {
-          padding-right: 8px;
-          padding-left: 8px;
-          flex-direction: column;
-          align-items: flex-start;
-          justify-content: initial;
-        }
-
-        .navigation {
-          display: flex;
-          align-items: center;
-          flex-grow: 0;
-        }
-
-        a {
-          color: var(--primary-text-color);
-        }
-
-        .controls {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-        }
-
-        .today {
-          margin-right: 20px;
-        }
-
-        .prev,
-        .next {
-          --mdc-icon-button-size: 32px;
-        }
-
-        ha-button-toggle-group {
-          color: var(--primary-color);
-        }
-        
-        #calendar {
-          flex-grow: 1;
-          background-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          min-height: 400px;
-          --fc-neutral-bg-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          --fc-list-event-hover-bg-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          --fc-theme-standard-border-color: var(--divider-color);
-          --fc-border-color: var(--divider-color);
-          height: 100%;
-        }
-
-        a {
-            color: inherit !important; 
-        }
-
-        .fc-theme-standard .fc-scrollgrid {
-          border: 1px solid var(--divider-color);
-        }
-
-        .fc-scrollgrid-section-header td {
-          border: none;
-        }
-
-        th.fc-col-header-cell.fc-day {
-          color: var(--secondary-text-color);
-          font-size: 11px;
-          font-weight: 400;
-          text-transform: uppercase;
-        }
-
-        .fc-daygrid-dot-event:hover {
-          background-color: inherit
-        }
-
-        .fc-daygrid-day-top {
-          text-align: center;
-          padding-top: 5px;
-          justify-content: center;
-        }
-
-        table.fc-scrollgrid-sync-table
-          tbody
-          tr:first-child
-          .fc-daygrid-day-top {
-          padding-top: 0;
-        }
-
-        a.fc-daygrid-day-number {
-          float: none !important;
-          font-size: 12px;
-        }
-
-        .fc .fc-daygrid-day-number {
-            padding: 3px !important;
-        }
-
-        .fc .fc-daygrid-day.fc-day-today {
-          background: inherit;
-        }
-
-        td.fc-day-today .fc-daygrid-day-top {
-          padding-top: 4px;
-        }
-
-        td.fc-day-today .fc-daygrid-day-number {
-          height: 24px;
-          color: var(--text-primary-color) !important;
-          background-color: var(--primary-color);
-          border-radius: 50%;
-          display: inline-block;
-          text-align: center;
-          white-space: nowrap;
-          width: max-content;
-          min-width: 24px;
-          line-height: 140%;
-        }
-
-        .fc-daygrid-day-events {
-          margin-top: 4px;
-        }
-
-        .fc-event {
-          border-radius: 4px;
-          line-height: 1.7;
-        }
-
-        .fc-daygrid-block-event .fc-event-main {
-          padding: 0 1px;
-        }
-
-        .fc-day-past .fc-daygrid-day-events {
-          opacity: 0.5;
-        }
-
-        .fc-icon-x:before {
-          font-family: var(--material-font-family);
-          content: "X";
-        }
-
-        .fc-popover {
-          background-color: var(--primary-background-color) !important;
-        }
-
-        .fc-popover-header {
-          background-color: var(--secondary-background-color) !important;
-        }
-
-        .fc-theme-standard .fc-list-day-frame {
-          background-color: transparent;
-        }
-
-        .fc-list.fc-view,
-        .fc-list-event.fc-event td {
-          border: none;
-        }
-
-        .fc-list-day.fc-day th {
-          border-bottom: none;
-          border-top: 1px solid var(--fc-theme-standard-border-color, #ddd) !important;
-        }
-
-        .fc-list-day-text {
-          font-size: 16px;
-          font-weight: 400;
-        }
-
-        .fc-list-day-side-text {
-          font-weight: 400;
-          font-size: 16px;
-          color: var(--primary-color);
-        }
-
-        .fc-list-table td,
-        .fc-list-day-frame {
-          padding-top: 12px;
-          padding-bottom: 12px;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view
-          .fc-daygrid-dot-event
-          .fc-event-time,
-        :host([narrow]) .fc-dayGridMonth-view
-          .fc-daygrid-dot-event
-          .fc-event-title,
-          :host([narrow]) .fc-dayGridMonth-view .fc-daygrid-day-bottom {
-          display: none;
-        }
-
-        :host([narrow]) .fc .fc-dayGridMonth-view .fc-daygrid-event-harness-abs {
-          visibility: visible !important;
-          position: static;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view .fc-daygrid-day-events {
-          display: flex;
-          min-height: 2em !important;
-          justify-content: center;
-          flex-wrap: wrap;
-          max-height: 2em;
-          height: 2em;
-          overflow: hidden;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
-          overflow: hidden;
-        }
-
-        .fc-scroller::-webkit-scrollbar {
-          width: 0.4rem;
-          height: 0.4rem;
-        }
-
-        .fc-scroller::-webkit-scrollbar-thumb {
-          -webkit-border-radius: 4px;
-          border-radius: 4px;
-          background: var(--scrollbar-thumb-color);
-        }
-
-        .fc-scroller {
-          overflow-y: auto;
-          scrollbar-color: var(--scrollbar-thumb-color) transparent;
-          scrollbar-width: thin;
-        }
-      `,
-    ];
+  constructor() {
+    super();
+    this._service = new CalendarService();
+    this._errors = new Map();
+    this._themeKeys = [];
   }
-  
-	get calendarHtml() {
-		const viewToggleButtons =  viewButtons.filter((button) =>
-      		this.views.includes(button.value)
-    	);
-		
-		return html`<ha-card>
-      ${this.calendar
-        ? html`
-            <div class="header">
-              ${!this.narrow
-                ? html`
-                    <div class="navigation">
-                      <mwc-button
-                        outlined
-                        class="today"
-                        @click=${this._handleToday}
-                        >Today</mwc-button
-                      >
-                      <ha-icon-button
-                        label=${this._hass.localize("ui.common.previous")}
-                        icon="hass:chevron-left"
-                        class="prev"
-                        @click=${this._handlePrev}
-                      >
-                      </ha-icon-button>
-                      <ha-icon-button
-                        label=${this._hass.localize("ui.common.next")}
-                        icon="hass:chevron-right"
-                        class="next"
-                        @click=${this._handleNext}
-                      >
-                      </ha-icon-button>
-                    </div>
-                    <h1>
-                      ${this.calendar.view.title}
-                    </h1>
-                    <ha-button-toggle-group
-                      .buttons=${viewToggleButtons}
-                      .active=${this._activeView}
-                      @value-changed=${this._handleView}
-                    ></ha-button-toggle-group>
-                  `
-                : html`
-                    <div class="controls">
-                      <h1>
-                        ${this.calendar.view.title}
-                      </h1>
-                      <div>
-                        <ha-icon-button
-                          label=${this._hass.localize("ui.common.previous")}
-                          icon="hass:chevron-left"
-                          class="prev"
-                          @click=${this._handlePrev}
-                        >
-                        </ha-icon-button>
-                        <ha-icon-button
-                          label=${this._hass.localize("ui.common.next")}
-                          icon="hass:chevron-right"
-                          class="next"
-                          @click=${this._handleNext}
-                        >
-                        </ha-icon-button>
-                      </div>
-                    </div>
-                    <div class="controls">
-                      <mwc-button
-                        outlined
-                        class="today"
-                        @click=${this._handleToday}
-                        >Today</mwc-button
-                      >
-                      <ha-button-toggle-group
-                        .buttons=${viewToggleButtons}
-                        .active=${this._activeView}
-                        @value-changed=${this._handleView}
-                      ></ha-button-toggle-group>
-                    </div>
-                  `}
-            </div>
-          `
-        : ""}
-      <div id="calendar"></div></ha-card>
-    `;
-	}
-	
-  	render() {
-		return [this.calendarHtml];
-	}
-	
-  	get root(){
-  		return this.shadowRoot ? this.shadowRoot : this;
-  	}
-  	
-  	static get properties() {
-   		return {
-   			narrow: { 
-   				type: Boolean,
-        		reflect: true
-        	},
-        	views: {
-        		type: Object
-        	},
-        	initialView: {
-        		type: Object
-        	},
-   			isPanel: { 
-   				type: Boolean,
-        		reflect: true
-        	},
-        	_hass: {
-        		type: Object
-        	}
-        };
- 	}
- 	
- 	processConfigEntities(entities) {
-  		if (!Array.isArray(entities)) {
-    		throw new Error("Entities need to be an array");
-  		}
-  		
-		return entities.map((entityConf, index) => {
-			if (typeof entityConf === "string") {
-      			entityConf = { entity: entityConf, eventColor: "#3788d8" };
-    		} else if (typeof entityConf === "object" && !Array.isArray(entityConf)) {
-      			if (!entityConf.entity) {
-        			throw new Error(
-          				`Entity object at position ${index} is missing entity field.`
-        			);
-        			if(!entityConf.eventColor) entityConf = {...entityConf, eventColor: "#3788d8"};
-        		 }
-    		} else {
-      			throw new Error(`Invalid entity specified at position ${index}.`);
-    		}
-			return entityConf;
-  		});
-	}
-  	
-  	updateAspectRatio(){
-  		this._measureCard();
-  		
-  		if(!this.calendar) return;
-  		
-  		this.calendar.updateSize();
-  		// let portrait = (window.innerHeight > window.innerWidth);
-// 			
-// 			let aspectRatio = this._isPanel ?  (portrait ? 0.4 : 2.5) : 1.35;
-// 			if(aspectRatio != this.calendar.getOption('aspectRatio')){
-// 				this.calendar.setOption("aspectRatio", aspectRatio);
-// 			}
-  	}
-  	
-  	getEventSources(){
-  		return this.entities.map(entityConf => {
-  			return{
-  				events: async (info) => {
-  					return await this.calendarService.getEvents(this._hass, entityConf, info.start, info.end);
-  				},
-  				id: entityConf.entity.startsWith("calendar") ?
-  				(entityConf.name ? entityConf.name : this._hass.states[entityConf.entity].attributes.friendly_name)
-  				: "Entities",
-  				color: entityConf.eventColor
-  			}
-  		});
-  	}
-  	
 
-  	updated(changedProps){
-    	super.updated(changedProps);
-	
-		if (!this.calendar) {
-      		return;
-    	}
+  setConfig(config) {
+    this._config = normalizeConfig(config);
+    this._savedView = undefined;
+    this._savedDate = undefined;
+    this.renderRoot?.querySelector("dialog")?.close();
+    this.toggleAttribute("fill-height", this._config.fillHeight);
+  }
 
-    	if (changedProps.has("narrow")) {
-      		this.views = this.narrow ? ["list", "dayGridMonth", "dayGridDay"] 
-      			: [ "dayGridMonth", "dayGridWeek", "dayGridDay"];
-      		this.initialView = this.narrow ? "list" : "dayGridMonth";
-      		this._activeView = this.initialView;
-      		this.calendar.changeView(this._activeView);
-      		this.calendar.setOption("eventDisplay", this.narrow ? "list-item" : "auto");
-      		this.requestUpdate();
-    	}
-    	
-    	if (changedProps.has("views") && !this.views.includes(this._activeView)) {
-      		this._activeView = this.initialView && this.views.includes(this.initialView)
-          		? this.initialView
-          		: this.views[0];
-      		this.calendar.changeView(this._activeView);
-      		this.requestUpdate();
-    	}
-    	
-    	if (!this._config) {
-      		return;
-    	}
+  set hass(value) { this._hass = value; }
+  get hass() { return this._hass; }
+  getCardSize() { return 8; }
 
-    	if (this._hass) {
-      		const oldHass = changedProps.get('_hass');
-      			if (!oldHass || oldHass.themes !== this._hass.themes) {
-        			applyThemesOnElement(this, this._hass.themes, this._config.theme);
-      			}
-    	}
-  	}
-  	
-	firstUpdated(){
-		var calendarEl = this.root.querySelector("#calendar");
-		let portrait = (window.innerHeight > window.innerWidth);
-		
-		tippy.setDefaultProps({ maxWidth: '', maxHeight: '' });
-		
-		this.calendar = new Calendar(calendarEl, {
-    		plugins: [dayGridPlugin, listPlugin, interactionPlugin],
-    		//aspectRatio: this.isPanel ?  (portrait ? 0.4 : 2.5) : 1.35,
-    		initialView: this.initialView,
-    		locale: this._hass.language,
-    		eventDisplay: "auto",
-    		views: {
-    			list: {
-      				visibleRange: getListWeekRange,
-    			},
-  			},
-    		headerToolbar: false,
-    		height: "parent",
-    		eventTimeFormat: {
-    			hour: 'numeric',
-    			minute: '2-digit',
-    			hour12: false
-  			},
-  			eventSources: this.getEventSources(),
-  			windowResize: () => {
-    			this.updateAspectRatio();
-  			},
-  			eventDidMount: function(info) {
-    			tippy(info.el, {
-  					content: `<div style="min-width:40em; min-height:10em;">
-  						<h2>${info.event.title}</h2>
-  						<p><ha-icon icon="mdi:clock"></ha-icon> ${info.event.extendedProps.displayTime}</p>
-	 					<p></p>
-	 					<p><ha-icon icon="mdi:calendar"></ha-icon> ${info.event.source.id}</p>
-	 				</div>
-	 		`,
-	 				arrow: false,
-  					animation: 'scale-extreme',
-  					placement: 'auto',
-  					theme: 'homeassistant',
-  					appendTo: calendarEl,
-  					trigger: 'click',
-  					hideOnClick: true,
-  					onHide(instance) {
-    					let now = new Date();
-    					instance.lastHidden = now;
-    				},
-    				onShow(instance) {
-    					let now = new Date();
-    					if(instance.lastHidden){
-    						// Block if showing las than 0.5 seconds after hiding
-    						let ago = now.getTime() - instance.lastHidden.getTime();
-    						if(ago < 500) return false;
-    					}	
-    				},
-    				popperOptions: {
-    					modifiers: [
-      						{
-        						name: 'flip',
-        						options: {
-          							fallbackPlacements: ['bottom', 'right'],
-        						},
-      						},
-      						{
-        						name: 'preventOverflow',
-        						options: {
-          							altAxis: true,
-          							tether: false,
-        						},
-      						},
-    					],
-  					},
-  					allowHTML: true
-				});
-  			}
-  		});
-  		
-  		this.calendar.render();
-  		this._measureCard();
-  		this.requestUpdate();
-  		
-	}
-  	
-  	getCardSize() {
-    	return 2;
-  	}
-  	
-  	_measureCard() {
-  		let card = this.shadowRoot.querySelector("#calendar");
-  		if(!card) return;
-    	this.narrow = card.offsetWidth < 870;
+  connectedCallback() {
+    super.connectedCallback();
+    this.requestUpdate();
+    // Calendar entities may change future events without changing their current state.
+    this._refreshTimer = setInterval(() => {
+      if (!document.hidden) this.calendar?.refetchEvents();
+    }, 60000);
+  }
 
-		this.requestUpdate();
-  	}
-  	
-	set hass(hass) {
-		this._hass = hass;
-		if(this.calendar){
-			this.updateAspectRatio();
-		}
-	}
-	
-	_handleNext() {
-    	this.calendar.next();
-    	this.requestUpdate();
-  	}
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    clearInterval(this._refreshTimer);
+    this._savedView = this.calendar?.view.type;
+    this._savedDate = this.calendar?.getDate();
+    this.calendar?.destroy();
+    this.calendar = undefined;
+    this._selectedEvent = undefined;
+  }
 
-	_handlePrev() {
-    	this.calendar.prev();
-    	this.requestUpdate();
-  	}
-  	
-	_handleToday() {
-    	this.calendar.today();
-		this.requestUpdate();
-	}
-  
-  	_handleView(ev) {
-    	this._activeView = ev.detail.value;
-    	this.calendar.changeView(this._activeView);
-    	this.requestUpdate();
-  	}
+  updated(changed) {
+    if (!this._config || !this._hass || !this.isConnected) return;
+    const preferences = resolvePreferences(this._config, this._hass);
+    const preferencesChanged = JSON.stringify(preferences) !== JSON.stringify(this._preferences);
+    this._preferences = preferences;
+    if (changed.has("_config") && this.calendar) {
+      this.calendar.destroy();
+      this.calendar = undefined;
+      this._savedView = undefined;
+      this._savedDate = undefined;
+      this._selectedEvent = undefined;
+      this._errors = new Map();
+    }
+    if (!this.calendar) this._createCalendar();
+    else if (preferencesChanged) {
+      this.calendar.batchRendering(() => {
+        this.calendar.setOption("locale", preferences.language);
+        this.calendar.setOption("firstDay", preferences.firstDay);
+        this.calendar.setOption("timeZone", preferences.timeZone);
+        this.calendar.setOption("eventTimeFormat", eventTimeFormat(preferences.hour12));
+      });
+    }
+    if (changed.has("_hass") || changed.has("_config")) {
+      const oldHass = changed.get("_hass");
+      if (oldHass && this._config.entities.some(({ entity }) => oldHass.states?.[entity] !== this._hass.states?.[entity])) {
+        this.calendar.refetchEvents();
+      }
+      this._applyTheme();
+    }
+    // FullCalendar 7 observes its containers with ResizeObserver. destroy() releases
+    // those observers; no window resize listener or deprecated updateSize() is needed.
+  }
+
+  _createCalendar() {
+    const config = this._config;
+    const preferences = this._preferences;
+    this.calendar = new Calendar(this.renderRoot.querySelector("#calendar"), {
+      plugins: [classicTheme, dayGridPlugin, listPlugin, multiMonthPlugin],
+      locales,
+      locale: preferences.language,
+      firstDay: preferences.firstDay,
+      timeZone: preferences.timeZone,
+      initialView: this._savedView || config.initialView,
+      ...(this._savedDate ? { initialDate: this._savedDate } : {}),
+      headerToolbar: false,
+      height: config.fillHeight ? "100%" : "auto",
+      views: {
+        multiMonthTwo: {
+          type: "multiMonth", duration: { months: 2 },
+          dateIncrement: { months: 2 }, dateAlignment: "month",
+        },
+        list: { type: "list", duration: { weeks: 1 } },
+      },
+      multiMonthMaxColumns: 1,
+      singleMonthTitleFormat: { month: "long", year: "numeric" },
+      // Disable FullCalendar's own narrow-day event collapse as well as the old card breakpoint.
+      dayNarrowWidth: 0,
+      eventDisplay: "block",
+      eventInteractive: true,
+      displayEventEnd: config.displayEventEnd,
+      eventTimeFormat: eventTimeFormat(preferences.hour12),
+      dayMaxEvents: config.fillHeight ? true : 5,
+      moreLinkClick: "popover",
+      eventClass: "family-event",
+      eventInnerClass: "family-event-inner",
+      dayHeaderClass: "family-day-header",
+      dayCellClass: "family-day-cell",
+      singleMonthClass: "family-month",
+      singleMonthHeaderClass: "family-month-header",
+      tableBodyClass: ({ multiMonthColumns }) => multiMonthColumns ? "family-month-body" : "",
+      moreLinkClass: "family-more-link",
+      popoverClass: "family-overflow",
+      eventContent: (info) => {
+        // FullCalendar owns the time range and all-day semantics. Only wrap its text for readability.
+        const nodes = [];
+        let timeText = info.timeText;
+        // FullCalendar 7 suppresses timeText in its smallest cells even with
+        // dayNarrowWidth: 0. Use its public formatter in that case, without changing titles.
+        if (!timeText && !info.event.allDay && (info.isStart || info.isEnd)) {
+          const format = eventTimeFormat(this._preferences.hour12);
+          timeText = config.displayEventEnd && info.event.end
+            ? this.calendar.formatRange(info.event.start, info.event.end, format)
+            : this.calendar.formatDate(info.event.start, format);
+        }
+        if (timeText && !info.event.allDay) {
+          const time = document.createElement("span");
+          time.className = "event-time";
+          time.textContent = `${timeText} `;
+          nodes.push(time);
+        }
+        const title = document.createElement("span");
+        title.className = "event-title";
+        title.textContent = info.event.title;
+        nodes.push(title);
+        return { domNodes: nodes };
+      },
+      eventClick: (info) => this._openEvent(info.event),
+      datesSet: ({ view }) => {
+        this._title = view.title;
+        this._activeView = view.type;
+      },
+      eventSources: config.entities.map((entity, index) => ({
+        id: `${entity.entity}-${index}`,
+        color: entity.eventColor,
+        events: async ({ start, end }) => {
+          try {
+            const events = await this._service.getEvents(this._hass, entity, start, end);
+            if (this._config === config && this._errors.has(index)) {
+              this._errors = new Map(this._errors);
+              this._errors.delete(index);
+            }
+            return events;
+          } catch (error) {
+            if (this._config === config) {
+              this._errors = new Map(this._errors).set(index, {
+                name: calendarName(this._hass, entity), reason: error.message,
+              });
+            }
+            return [];
+          }
+        },
+      })),
+    });
+    this.calendar.render();
+  }
+
+  _applyTheme() {
+    for (const key of this._themeKeys) this.style.removeProperty(key);
+    this._themeKeys = [];
+    const themes = this._hass.themes;
+    const theme = themes?.themes?.[this._config.theme];
+    if (!theme) return;
+    const values = { ...theme, ...theme.modes?.[themes.darkMode ? "dark" : "light"] };
+    for (const [key, value] of Object.entries(values)) {
+      if (key !== "modes" && (typeof value === "string" || typeof value === "number")) {
+        this.style.setProperty(`--${key}`, String(value));
+        this._themeKeys.push(`--${key}`);
+      }
+    }
+  }
+
+  async _openEvent(event) {
+    this._selectedEvent = event;
+    await this.updateComplete;
+    if (!this.isConnected || this._selectedEvent !== event) return;
+    this.renderRoot.querySelector("dialog").showModal();
+  }
+
+  _button(label, action, active = undefined) {
+    // Do not load HA's private card modules just to register a control.
+    return customElements.get("ha-button")
+      ? html`<ha-button size="small" appearance=${active ? "filled" : "plain"}
+          aria-pressed=${active === undefined ? nothing : String(active)}
+          @click=${action}>${label}</ha-button>`
+      : html`<button type="button" aria-pressed=${active === undefined ? nothing : String(active)}
+          @click=${action}>${label}</button>`;
+  }
+
+  _navigationButton(label, path, action) {
+    return customElements.get("ha-icon-button")
+      ? html`<ha-icon-button .path=${path} .label=${label} @click=${action}></ha-icon-button>`
+      : html`<button type="button" class="icon-button" aria-label=${label} @click=${action}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d=${path}></path></svg>
+        </button>`;
+  }
+
+  render() {
+    if (!this._config) return nothing;
+    const event = this._selectedEvent;
+    const preferences = resolvePreferences(this._config, this._hass);
+    const labels = getLabels(preferences.language);
+    return html`
+      <ha-card>
+        <header>
+          <div class="navigation" aria-label=${labels.navigation}>
+            ${this._navigationButton(labels.previous, previousPath, () => this.calendar?.prev())}
+            ${this._button(labels.today, () => this.calendar?.today())}
+            ${this._navigationButton(labels.next, nextPath, () => this.calendar?.next())}
+          </div>
+          <h2 aria-live="polite">${this._title || labels.calendar}</h2>
+          <div class="views" role="group" aria-label=${labels.view}>
+            ${this._config.views.map((view) => this._button(labels[view],
+              () => this.calendar?.changeView(view), this._activeView === view))}
+          </div>
+        </header>
+        ${this._errors.size ? html`<div class="errors" role="alert">
+          ${[...this._errors.values()].map((error) => html`<p>${labels.loadError(error.name, error.reason || labels.requestFailed)}</p>`)}
+        </div>` : nothing}
+        <div class="calendar-container"><div id="calendar"></div></div>
+      </ha-card>
+      <dialog aria-labelledby="event-title" @close=${() => { this._selectedEvent = undefined; }}>
+        ${event ? html`
+          <h2 id="event-title">${event.title}</h2>
+          <p class="event-dates">${formatEventDetails(event, preferences)}</p>
+          <p class="event-calendar">${event.extendedProps.calendarName}</p>
+          ${event.extendedProps.location ? html`<p>${labels.location}: ${event.extendedProps.location}</p>` : nothing}
+          ${event.extendedProps.description ? html`<p class="description">${event.extendedProps.description}</p>` : nothing}
+          <div class="dialog-actions">${this._button(labels.close, () => this.renderRoot.querySelector("dialog").close())}</div>
+        ` : nothing}
+      </dialog>`;
+  }
 }
-    
-customElements.define('fullcalendar-card', FullCalendarCard);
+
+if (!customElements.get("fullcalendar-card")) customElements.define("fullcalendar-card", FullCalendarCard);
+window.customCards = window.customCards || [];
+window.customCards.push({ type: "fullcalendar-card", name: "FullCalendar", description: "A multi-calendar family dashboard" });

@@ -1,410 +1,94 @@
-import { html, css } from "lit-element";
-import coreCSS from '@fullcalendar/common/main.css';
-import daygridCSS from '@fullcalendar/daygrid/main.css';
-import tippyCSS from 'tippy.js/dist/tippy.css';
-import tippyAnimationCSS from 'tippy.js/animations/scale-extreme.css';
-import tippyThemeCSS from './tippy-theme.css';
+import { css, unsafeCSS } from "lit";
+import skeleton from "fullcalendar/skeleton.css";
+import classic from "fullcalendar/themes/classic/theme.css";
 
-export const haStyle = css`
+export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   :host {
-    font-family: var(--paper-font-body1_-_font-family);
-    -webkit-font-smoothing: var(--paper-font-body1_-_-webkit-font-smoothing);
-    font-size: var(--paper-font-body1_-_font-size);
-    font-weight: var(--paper-font-body1_-_font-weight);
-    line-height: var(--paper-font-body1_-_line-height);
+    display: block;
+    min-width: 0;
+    color: var(--primary-text-color, #212121);
+    --fc-classic-primary: var(--primary-color, #03a9f4);
+    --fc-classic-primary-foreground: var(--text-primary-color, #fff);
+    --fc-classic-event: var(--fc-classic-primary);
+    --fc-classic-event-contrast: #fff;
+    --fc-classic-background: var(--ha-card-background, var(--card-background-color, #fff));
+    --fc-classic-foreground: var(--primary-text-color, #212121);
+    --fc-classic-muted-foreground: var(--secondary-text-color, #727272);
+    --fc-classic-faint-foreground: var(--secondary-text-color, #727272);
+    --fc-classic-border: var(--divider-color, #ddd);
+    --fc-classic-strong-border: var(--divider-color, #ddd);
+    --fc-classic-faint: color-mix(in srgb, var(--primary-text-color, #000) 4%, transparent);
+    --fc-classic-muted: color-mix(in srgb, var(--primary-text-color, #000) 8%, transparent);
+    --fc-classic-strong: color-mix(in srgb, var(--primary-text-color, #000) 14%, transparent);
+    --fc-classic-today: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+    --fc-classic-small-dot-width: 8px;
+    --fc-classic-large-dot-width: 10px;
   }
-
-  app-header-layout,
-  ha-app-layout {
-    background-color: var(--primary-background-color);
+  :host([fill-height]) { height: 100%; min-height: 0; }
+  ha-card {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    box-sizing: border-box;
+    background: var(--ha-card-background, var(--card-background-color, #fff));
+    container-type: inline-size;
   }
-
-  app-header,
-  app-toolbar {
-    background-color: var(--app-header-background-color);
-    font-weight: 400;
-    color: var(--app-header-text-color, white);
-  }
-
-  app-toolbar {
-    height: var(--header-height);
-  }
-
-  app-header div[sticky] {
-    height: 48px;
-  }
-
-  app-toolbar [main-title] {
-    margin-left: 20px;
-  }
-
-  h1 {
-    font-family: var(--paper-font-headline_-_font-family);
-    -webkit-font-smoothing: var(--paper-font-headline_-_-webkit-font-smoothing);
-    white-space: var(--paper-font-headline_-_white-space);
-    overflow: var(--paper-font-headline_-_overflow);
-    text-overflow: var(--paper-font-headline_-_text-overflow);
-    font-size: var(--paper-font-headline_-_font-size);
-    font-weight: var(--paper-font-headline_-_font-weight);
-    line-height: var(--paper-font-headline_-_line-height);
-  }
-
-  h2 {
-    font-family: var(--paper-font-title_-_font-family);
-    -webkit-font-smoothing: var(--paper-font-title_-_-webkit-font-smoothing);
-    white-space: var(--paper-font-title_-_white-space);
-    overflow: var(--paper-font-title_-_overflow);
-    text-overflow: var(--paper-font-title_-_text-overflow);
-    font-size: var(--paper-font-title_-_font-size);
-    font-weight: var(--paper-font-title_-_font-weight);
-    line-height: var(--paper-font-title_-_line-height);
-  }
-
-  h3 {
-    font-family: var(--paper-font-subhead_-_font-family);
-    -webkit-font-smoothing: var(--paper-font-subhead_-_-webkit-font-smoothing);
-    white-space: var(--paper-font-subhead_-_white-space);
-    overflow: var(--paper-font-subhead_-_overflow);
-    text-overflow: var(--paper-font-subhead_-_text-overflow);
-    font-size: var(--paper-font-subhead_-_font-size);
-    font-weight: var(--paper-font-subhead_-_font-weight);
-    line-height: var(--paper-font-subhead_-_line-height);
-  }
-
-  a {
-    color: var(--primary-color);
-  }
-
-  .secondary {
-    color: var(--secondary-text-color);
-  }
-
-  .error {
-    color: var(--error-color);
-  }
-
-  .warning {
-    color: var(--error-color);
-  }
-
-  mwc-button.warning {
-    --mdc-theme-primary: var(--error-color);
-  }
-
-  button.link {
-    background: none;
-    color: inherit;
-    border: none;
-    padding: 0;
+  :host([fill-height]) ha-card { height: 100%; min-height: 0; }
+  header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding-bottom: 12px; }
+  h2 { font-size: 1.25rem; font-weight: 500; margin: 0; }
+  header h2 { flex: 1; text-align: center; }
+  .navigation, .views { display: flex; align-items: center; gap: 4px; }
+  .views { flex-wrap: wrap; }
+  button {
     font: inherit;
-    text-align: left;
-    text-decoration: underline;
+    color: var(--primary-color, #0276aa);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    padding: 8px 12px;
+    min-height: 40px;
     cursor: pointer;
   }
-
-  .card-actions a {
-    text-decoration: none;
+  button:hover, button[aria-pressed="true"] { background: var(--fc-classic-today); }
+  button:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); }
+  .icon-button { display: inline-flex; padding: 8px; }
+  svg { width: 24px; height: 24px; fill: currentColor; }
+  .calendar-container { min-width: 0; }
+  :host([fill-height]) .calendar-container { flex: 1; min-height: 0; overflow: hidden; container-type: size; }
+  :host([fill-height]) #calendar { height: 100%; }
+  #calendar { font-size: 14px; }
+  .family-event { cursor: pointer; border-radius: 4px; }
+  .family-event-inner { display: block; white-space: normal; overflow-wrap: anywhere; padding: 2px 3px; line-height: 1.35; }
+  .event-time { font-weight: 600; margin-inline-end: 0.35em; }
+  .event-title { white-space: normal; }
+  .family-day-header { font-size: 0.85em; }
+  .family-month-header { font-weight: 500; }
+  .family-month-body { min-height: 600px; }
+  :host([fill-height]) .family-month-body { min-height: max(600px, calc(50cqh - 4.25rem)); }
+  .family-overflow { max-width: min(420px, 90vw); }
+  .errors { color: var(--error-color, #b00020); font-size: 0.9rem; }
+  .errors p { margin: 0 0 8px; }
+  dialog {
+    color: var(--primary-text-color, #212121);
+    background: var(--ha-card-background, var(--card-background-color, #fff));
+    border: 1px solid var(--divider-color, #ddd);
+    border-radius: 16px;
+    padding: 24px;
+    width: min(480px, calc(100vw - 64px));
+    max-height: calc(100dvh - 96px);
+    overflow: auto;
+    overflow-wrap: anywhere;
+    box-shadow: 0 8px 32px #0004;
   }
-
-  .card-actions .warning {
-    --mdc-theme-primary: var(--error-color);
+  dialog::backdrop { background: #0006; }
+  .event-calendar { color: var(--secondary-text-color, #727272); }
+  .description { white-space: pre-wrap; }
+  .dialog-actions { display: flex; justify-content: flex-end; }
+  @container (max-width: 650px) {
+    header { justify-content: center; gap: 8px; }
+    header h2 { order: -1; flex-basis: 100%; }
+    #calendar { font-size: 12px; }
+    .family-event-inner { padding: 1px 2px; }
+    .event-time { display: block; }
   }
-
-  .layout.horizontal,
-  .layout.vertical {
-    display: flex;
-  }
-  .layout.inline {
-    display: inline-flex;
-  }
-  .layout.horizontal {
-    flex-direction: row;
-  }
-  .layout.vertical {
-    flex-direction: column;
-  }
-  .layout.wrap {
-    flex-wrap: wrap;
-  }
-  .layout.no-wrap {
-    flex-wrap: nowrap;
-  }
-  .layout.center,
-  .layout.center-center {
-    align-items: center;
-  }
-  .layout.bottom {
-    align-items: flex-end;
-  }
-  .layout.center-justified,
-  .layout.center-center {
-    justify-content: center;
-  }
-  .flex {
-    flex: 1;
-    flex-basis: 0.000000001px;
-  }
-  .flex-auto {
-    flex: 1 1 auto;
-  }
-  .flex-none {
-    flex: none;
-  }
-  .layout.justified {
-    justify-content: space-between;
-  }
-`;
-
-export function fullCalendarStyles() {
-		return html`<style type="text/css">
-      		${haStyle}
-      		${coreCSS}
-			${daygridCSS}
-			${tippyCSS}
-			${tippyAnimationCSS}
-			${tippyThemeCSS}
-			
-			:host {
-          display: flex;
-          flex-direction: column;
-          --fc-theme-standard-border-color: var(--divider-color);
-        }
-
-        .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-bottom: 8px;
-        }
-
-        :host([narrow]) .header {
-          padding-right: 8px;
-          padding-left: 8px;
-          flex-direction: column;
-          align-items: flex-start;
-          justify-content: initial;
-        }
-
-        .navigation {
-          display: flex;
-          align-items: center;
-          flex-grow: 0;
-        }
-
-        a {
-          color: var(--primary-text-color);
-        }
-
-        .controls {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-        }
-
-        .today {
-          margin-right: 20px;
-        }
-
-        .prev,
-        .next {
-          --mdc-icon-button-size: 32px;
-        }
-
-        ha-button-toggle-group {
-          color: var(--primary-color);
-        }
-
-        #calendar {
-          flex-grow: 1;
-          background-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          min-height: 400px;
-          --fc-neutral-bg-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          --fc-list-event-hover-bg-color: var(
-            --ha-card-background,
-            var(--card-background-color, white)
-          );
-          --fc-theme-standard-border-color: var(--divider-color);
-          --fc-border-color: var(--divider-color);
-        }
-
-        a {
-            color: inherit !important; 
-        }
-
-        .fc-theme-standard .fc-scrollgrid {
-          border: 1px solid var(--divider-color);
-        }
-
-        .fc-scrollgrid-section-header td {
-          border: none;
-        }
-
-        th.fc-col-header-cell.fc-day {
-          color: var(--secondary-text-color);
-          font-size: 11px;
-          font-weight: 400;
-          text-transform: uppercase;
-        }
-
-        .fc-daygrid-dot-event:hover {
-          background-color: inherit
-        }
-
-        .fc-daygrid-day-top {
-          text-align: center;
-          padding-top: 5px;
-          justify-content: center;
-        }
-
-        table.fc-scrollgrid-sync-table
-          tbody
-          tr:first-child
-          .fc-daygrid-day-top {
-          padding-top: 0;
-        }
-
-        a.fc-daygrid-day-number {
-          float: none !important;
-          font-size: 12px;
-        }
-
-        .fc .fc-daygrid-day-number {
-            padding: 3px !important;
-        }
-
-        .fc .fc-daygrid-day.fc-day-today {
-          background: inherit;
-        }
-
-        td.fc-day-today .fc-daygrid-day-top {
-          padding-top: 4px;
-        }
-
-        td.fc-day-today .fc-daygrid-day-number {
-          height: 24px;
-          color: var(--text-primary-color) !important;
-          background-color: var(--primary-color);
-          border-radius: 50%;
-          display: inline-block;
-          text-align: center;
-          white-space: nowrap;
-          width: max-content;
-          min-width: 24px;
-          line-height: 140%;
-        }
-
-        .fc-daygrid-day-events {
-          margin-top: 4px;
-        }
-
-        .fc-event {
-          border-radius: 4px;
-          line-height: 1.7;
-        }
-
-        .fc-daygrid-block-event .fc-event-main {
-          padding: 0 1px;
-        }
-
-        .fc-day-past .fc-daygrid-day-events {
-          opacity: 0.5;
-        }
-
-        .fc-icon-x:before {
-          font-family: var(--material-font-family);
-          content: "X";
-        }
-
-        .fc-popover {
-          background-color: var(--primary-background-color) !important;
-        }
-
-        .fc-popover-header {
-          background-color: var(--secondary-background-color) !important;
-        }
-
-        .fc-theme-standard .fc-list-day-frame {
-          background-color: transparent;
-        }
-
-        .fc-list.fc-view,
-        .fc-list-event.fc-event td {
-          border: none;
-        }
-
-        .fc-list-day.fc-day th {
-          border-bottom: none;
-          border-top: 1px solid var(--fc-theme-standard-border-color, #ddd) !important;
-        }
-
-        .fc-list-day-text {
-          font-size: 16px;
-          font-weight: 400;
-        }
-
-        .fc-list-day-side-text {
-          font-weight: 400;
-          font-size: 16px;
-          color: var(--primary-color);
-        }
-
-        .fc-list-table td,
-        .fc-list-day-frame {
-          padding-top: 12px;
-          padding-bottom: 12px;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view
-          .fc-daygrid-dot-event
-          .fc-event-time,
-        :host([narrow]) .fc-dayGridMonth-view
-          .fc-daygrid-dot-event
-          .fc-event-title,
-          :host([narrow]) .fc-dayGridMonth-view .fc-daygrid-day-bottom {
-          display: none;
-        }
-
-        :host([narrow]) .fc .fc-dayGridMonth-view .fc-daygrid-event-harness-abs {
-          visibility: visible !important;
-          position: static;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view .fc-daygrid-day-events {
-          display: flex;
-          min-height: 2em !important;
-          justify-content: center;
-          flex-wrap: wrap;
-          max-height: 2em;
-          height: 2em;
-          overflow: hidden;
-        }
-
-        :host([narrow]) .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
-          overflow: hidden;
-        }
-
-        .fc-scroller::-webkit-scrollbar {
-          width: 0.4rem;
-          height: 0.4rem;
-        }
-
-        .fc-scroller::-webkit-scrollbar-thumb {
-          -webkit-border-radius: 4px;
-          border-radius: 4px;
-          background: var(--scrollbar-thumb-color);
-        }
-
-        .fc-scroller {
-          overflow-y: auto;
-          scrollbar-color: var(--scrollbar-thumb-color) transparent;
-          scrollbar-width: thin;
-        }
-      		</style>`;
-	}
+`];
