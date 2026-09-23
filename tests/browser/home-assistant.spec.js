@@ -37,6 +37,17 @@ test("Home Assistant 2026.1 panel integration", async ({ page }) => {
   await expect(await revealEvent(card)).toContainText(/14:30\s*–\s*16:00/);
   await page.keyboard.press("Escape");
 
+  const calendarControls = card.getByRole("group", { name: "Calendars", exact: true });
+  await expect(calendarControls.getByRole("button", { pressed: true })).toHaveCount(4);
+  await calendarControls.getByRole("button", { name: "Person 1", exact: true }).click();
+  await expect(calendarControls.getByRole("button", { name: "Person 1", exact: true, pressed: false })).toBeVisible();
+  await expect(card.locator(".family-event").filter({ hasText: "Simskola" })).toHaveCount(0);
+  await expect(card.locator(".family-event").filter({ hasText: "Person 2 appointment" }).first()).toBeAttached();
+  await calendarControls.getByRole("button", { name: "Person 1", exact: true }).click();
+  await expect(calendarControls.getByRole("button", { name: "Person 1", exact: true, pressed: true })).toBeVisible();
+  await expect(await revealEvent(card)).toContainText("Simskola");
+  await page.keyboard.press("Escape");
+
   for (const [label, view, days, months] of [
     ["Day", "dayGridDay", 1, 0], ["Week", "dayGridWeek", 7, 0],
     ["Two weeks", "dayGridTwoWeeks", 14, 0],

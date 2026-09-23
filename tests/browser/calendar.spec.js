@@ -190,6 +190,7 @@ for (const language of ["sv", "sv-SE"]) {
     await expect(page.getByRole("button", { name: "Idag", exact: true })).toBeVisible();
     await expect(page.locator(".navigation")).toHaveAttribute("aria-label", "Kalendernavigering");
     await expect(page.getByRole("group", { name: "Kalendervy", exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Kalendrar", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Nästa", exact: true }).click();
     await expect(page.locator("header h2")).toContainText("16 september 2026");
     await page.getByRole("button", { name: "Förra", exact: true }).click();
@@ -297,3 +298,96 @@ for (const fillHeight of [false, true]) {
     await expect(page.locator(".family-overflow .family-event")).toHaveCount(32);
   });
 }
+
+test("calendar toggles filter every view and allow all calendars to be hidden", async ({ page }) => {
+  await page.evaluate(() => mountCard({ views: ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo", "list"] }));
+  const controls = page.getByRole("group", { name: "Calendars", exact: true });
+  await expect(controls.getByRole("button")).toHaveCount(4);
+  expect(await controls.locator(".calendar-color").evaluateAll((colors) => new Set(colors.map((color) => getComputedStyle(color).backgroundColor)).size)).toBe(4);
+  const person = controls.getByRole("button", { name: "Person 1", exact: true });
+  for (const label of ["Day", "Week", "Two weeks", "Month", "Two months", "List"]) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await page.evaluate(() => card.calendar.gotoDate("2026-09-15"));
+    const original = await page.evaluate(() => ({ date: card.calendar.getDate().toISOString(), view: card.calendar.view.type }));
+    await expect(page.locator(".family-event").filter({ hasText: "Simskola" }).first()).toBeAttached();
+    await person.click();
+    await expect(person).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator(".family-event").filter({ hasText: "Simskola" })).toHaveCount(0);
+    await expect(page.locator(".family-event").filter({ hasText: "Förskolan stängd" })).toHaveCount(0);
+    await expect(page.locator(".family-event").filter({ hasText: "Person 2 appointment" }).first()).toBeAttached();
+    expect(await page.evaluate(() => ({ date: card.calendar.getDate().toISOString(), view: card.calendar.view.type }))).toEqual(original);
+    await person.click();
+    await expect(person).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".family-event").filter({ hasText: "Simskola" }).first()).toBeAttached();
+  }
+  for (const button of await controls.getByRole("button").all()) await button.click();
+  await expect(page.locator(".family-event")).toHaveCount(0);
+  await expect(controls.locator('[aria-pressed="false"]')).toHaveCount(4);
+  await person.focus();
+  await page.keyboard.press("Space");
+  await expect(person).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".family-event").filter({ hasText: "Simskola" }).first()).toBeAttached();
+  await expect(page.locator(".family-event").filter({ hasText: "Person 2 appointment" })).toHaveCount(0);
+});
+
+test("hidden calendars stay hidden through navigation, preferences, refresh and reconnect", async ({ page }) => {
+  const person = page.getByRole("group", { name: "Calendars", exact: true }).getByRole("button", { name: "Person 1", exact: true });
+  await person.click();
+  await page.evaluate(() => {
+    window.calendarRequests = [];
+    const callApi = card.hass.callApi;
+    card.hass = { ...card.hass, callApi: (...args) => { calendarRequests.push(args[1]); return callApi(...args); } };
+  });
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Previous", exact: true }).click();
+  await page.getByRole("button", { name: "Two weeks", exact: true }).click();
+  await page.evaluate(async () => {
+    card.calendar.gotoDate("2026-09-15");
+    card.hass = { ...card.hass, locale: { ...card.hass.locale, language: "sv", first_weekday: "sunday", time_format: "12" } };
+    await card.updateComplete;
+    card.calendar.refetchEvents();
+    card.remove();
+    document.querySelector("#container").append(card);
+    await card.updateComplete;
+  });
+  const calendars = page.getByRole("group", { name: "Kalendrar", exact: true });
+  await expect(calendars.getByRole("button", { name: "Person 1", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".family-event").filter({ hasText: "Person 2 appointment" }).first()).toBeAttached();
+  await expect(page.locator(".family-event").filter({ hasText: "Simskola" })).toHaveCount(0);
+  expect(await page.evaluate(() => calendarRequests.length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => calendarRequests.some((url) => url.startsWith("calendars/calendar.person_1?")))).toBe(false);
+  await page.evaluate(() => { eventData[0] = { ...eventData[0], summary: "Updated swimming lesson" }; });
+  await calendars.getByRole("button", { name: "Person 1", exact: true }).click();
+  await expect(page.locator(".family-event").filter({ hasText: "Updated swimming lesson" }).first()).toBeAttached();
+});
+
+test("calendar toggles ignore stale requests and clear errors for hidden calendars", async ({ page }) => {
+  await page.evaluate(() => {
+    window.pendingCalendarRequests = [];
+    const callApi = card.hass.callApi;
+    card.hass.callApi = (method, url) => url.startsWith("calendars/calendar.person_1?")
+      ? new Promise((resolve, reject) => pendingCalendarRequests.push({ resolve, reject }))
+      : callApi(method, url);
+    card.calendar.refetchEvents();
+  });
+  await expect.poll(() => page.evaluate(() => pendingCalendarRequests.length)).toBe(1);
+  const person = page.getByRole("group", { name: "Calendars", exact: true }).getByRole("button", { name: "Person 1", exact: true });
+  await person.click();
+  await expect(page.locator(".family-event").filter({ hasText: "Simskola" })).toHaveCount(0);
+  await person.click();
+  await expect.poll(() => page.evaluate(() => pendingCalendarRequests.length)).toBe(2);
+  await page.evaluate(() => pendingCalendarRequests[1].resolve([{ summary: "Latest event", start: "2026-09-15", end: "2026-09-16" }]));
+  await expect(page.locator(".family-event").filter({ hasText: "Latest event" })).toHaveCount(1);
+  await page.evaluate(async () => {
+    pendingCalendarRequests[0].reject(new Error("stale failure"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".family-event").filter({ hasText: "Latest event" })).toHaveCount(1);
+  await page.evaluate(() => card.calendar.refetchEvents());
+  await expect.poll(() => page.evaluate(() => pendingCalendarRequests.length)).toBe(3);
+  await page.evaluate(() => pendingCalendarRequests[2].reject(new Error("current failure")));
+  await expect(page.getByRole("alert")).toContainText("Unable to load Person 1: current failure");
+  await person.click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});

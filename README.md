@@ -71,6 +71,12 @@ Invalid values fail early with a configuration message; for example, `firstDay: 
 
 Calendar event titles come from the events, not the entity's `name`. Calendar failures are shown in the card; other calendars can still load. Events refresh on navigation, relevant entity changes, and every minute while the page is visible. Upstream Google Calendar synchronization still depends on the HA integration.
 
+## Show or hide calendars
+
+A row of calendar toggles appears above the grid automatically. Each uses its configured `name` (or HA friendly name) and `eventColor`. A checkmark marks a visible calendar; hidden calendars have a crossed-out name. Click or use the keyboard to turn each calendar on or off, including hiding all calendars.
+
+The selection applies to every view and survives navigation, preference changes, refreshes of events, and reconnecting the card. Hidden calendars make no event API requests; showing one again loads its latest events. This is a display filter for this card. All calendars start visible again after a browser reload or editing the card configuration. No additional YAML is needed. The controls are grouped under **Calendars** / **Kalendrar** for screen readers.
+
 ## Monday-first week and start/end times
 
 ```yaml

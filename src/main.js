@@ -1,4 +1,5 @@
 import { LitElement, html, nothing } from "lit";
+import { styleMap } from "lit/directives/style-map.js";
 import { Calendar } from "fullcalendar";
 import dayGridPlugin from "fullcalendar/daygrid";
 import listPlugin from "fullcalendar/list";
@@ -22,6 +23,7 @@ export class FullCalendarCard extends LitElement {
     _activeView: { state: true },
     _selectedEvent: { state: true },
     _errors: { state: true },
+    _hiddenCalendars: { state: true },
   };
   static styles = styles;
 
@@ -29,11 +31,15 @@ export class FullCalendarCard extends LitElement {
     super();
     this._service = new CalendarService();
     this._errors = new Map();
+    this._hiddenCalendars = new Set();
+    this._sourceRequests = new Map();
     this._themeKeys = [];
   }
 
   setConfig(config) {
     this._config = normalizeConfig(config);
+    this._hiddenCalendars = new Set();
+    this._sourceRequests.clear();
     this._savedView = undefined;
     this._savedDate = undefined;
     this.renderRoot?.querySelector("dialog")?.close();
@@ -60,6 +66,7 @@ export class FullCalendarCard extends LitElement {
     this._savedDate = this.calendar?.getDate();
     this.calendar?.destroy();
     this.calendar = undefined;
+    this._sourceRequests.clear();
     this._selectedEvent = undefined;
   }
 
@@ -99,6 +106,7 @@ export class FullCalendarCard extends LitElement {
   _createCalendar() {
     const config = this._config;
     const preferences = this._preferences;
+    this._sourceRequests.clear();
     this.calendar = new Calendar(this.renderRoot.querySelector("#calendar"), {
       plugins: [classicTheme, dayGridPlugin, listPlugin, multiMonthPlugin],
       locales,
@@ -173,15 +181,22 @@ export class FullCalendarCard extends LitElement {
         id: `${entity.entity}-${index}`,
         color: entity.eventColor,
         events: async ({ start, end }) => {
+          const request = Symbol();
+          this._sourceRequests.set(index, request);
+          if (this._hiddenCalendars.has(index)) return [];
+          // Ignore requests superseded by toggles, navigation, or a rebuilt calendar.
+          const isCurrent = () => this._config === config &&
+            this._sourceRequests.get(index) === request && !this._hiddenCalendars.has(index);
           try {
             const events = await this._service.getEvents(this._hass, entity, start, end);
-            if (this._config === config && this._errors.has(index)) {
+            if (!isCurrent()) return [];
+            if (this._errors.has(index)) {
               this._errors = new Map(this._errors);
               this._errors.delete(index);
             }
             return events;
           } catch (error) {
-            if (this._config === config) {
+            if (isCurrent()) {
               this._errors = new Map(this._errors).set(index, {
                 name: calendarName(this._hass, entity), reason: error.message,
               });
@@ -192,6 +207,21 @@ export class FullCalendarCard extends LitElement {
       })),
     });
     this.calendar.render();
+  }
+
+  _toggleCalendar(index) {
+    const sourceId = `${this._config.entities[index].entity}-${index}`;
+    const hidden = new Set(this._hiddenCalendars);
+    if (hidden.has(index)) hidden.delete(index);
+    else hidden.add(index);
+    this._hiddenCalendars = hidden;
+    this._errors = new Map(this._errors);
+    this._errors.delete(index);
+    this._sourceRequests.delete(index);
+    if (hidden.has(index) && this._selectedEvent?.source?.id === sourceId) {
+      this.renderRoot.querySelector("dialog")?.close();
+    }
+    this.calendar?.getEventSourceById(sourceId)?.refetch();
   }
 
   _applyTheme() {
@@ -253,6 +283,16 @@ export class FullCalendarCard extends LitElement {
               () => this.calendar?.changeView(view), this._activeView === view))}
           </div>
         </header>
+        <div class="calendars" role="group" aria-label=${labels.calendars}>
+          ${this._config.entities.map((entity, index) =>
+            // Native buttons expose aria-pressed directly on the focusable control.
+            html`<button type="button" aria-pressed=${String(!this._hiddenCalendars.has(index))}
+              @click=${() => this._toggleCalendar(index)}>
+              <span class="calendar-color" style=${styleMap({ backgroundColor: entity.eventColor })} aria-hidden="true"></span>
+              <span class="calendar-check" aria-hidden="true">${this._hiddenCalendars.has(index) ? "" : "✓"}</span>
+              <span class="calendar-name">${calendarName(this._hass, entity)}</span>
+            </button>`)}
+        </div>
         ${this._errors.size ? html`<div class="errors" role="alert">
           ${[...this._errors.values()].map((error) => html`<p>${labels.loadError(error.name, error.reason || labels.requestFailed)}</p>`)}
         </div>` : nothing}

@@ -39,6 +39,12 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   header h2 { flex: 1; text-align: center; }
   .navigation, .views { display: flex; align-items: center; gap: 4px; }
   .views { flex-wrap: wrap; }
+  .calendars { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 12px; }
+  .calendars > button { max-width: 100%; min-height: 32px; padding: 6px 12px; font-size: 14px; }
+  .calendar-color { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
+  .calendar-check { display: inline-block; width: 1em; margin-inline: 4px; }
+  .calendar-name { white-space: normal; overflow-wrap: anywhere; }
+  .calendars [aria-pressed="false"] .calendar-name { text-decoration: line-through; }
   button {
     font: inherit;
     color: var(--primary-color, #0276aa);
