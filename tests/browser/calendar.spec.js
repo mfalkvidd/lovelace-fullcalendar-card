@@ -37,6 +37,7 @@ test("navigation, fixed view selection, and readable events", async ({ page }) =
 
 for (const [view, label, days, months] of [
   ["dayGridDay", "Day", 1, 0], ["dayGridWeek", "Week", 7, 0],
+  ["dayGridTwoWeeks", "Two weeks", 14, 0],
   ["dayGridMonth", "Month", 0, 1], ["multiMonthTwo", "Two months", 0, 2],
 ]) {
   test(`${label}: navigation interval, initialView and readable narrow times`, async ({ page }) => {
@@ -81,13 +82,17 @@ test("two complete months are stacked and retain independent weekday grids", asy
 });
 
 for (const [firstDay, expected] of [[0, 0], [1, 1], ["auto", 2]]) {
-  test(`firstDay ${firstDay} applies in week, month and two-month views`, async ({ page }) => {
+  test(`firstDay ${firstDay} applies in week, two-week, month and two-month views`, async ({ page }) => {
     await page.evaluate((firstDay) => mountCard({ firstDay }, { first_weekday: "tuesday" }), firstDay);
-    for (const label of ["Week", "Month", "Two months"]) {
+    for (const label of ["Week", "Two weeks", "Month", "Two months"]) {
       await page.getByRole("button", { name: label, exact: true }).click();
       expect(await page.evaluate(() => card.calendar.getOption("firstDay"))).toBe(expected);
       const firstText = await page.locator(".family-day-header").first().textContent();
       expect(firstText).toMatch([/Sun/, /Mon/, /Tue/][expected]);
+      if (label === "Two weeks") {
+        await expect(page.locator(".family-day-cell")).toHaveCount(14);
+        expect(await page.evaluate(() => card.calendar.view.currentStart.getDay())).toBe(expected);
+      }
     }
   });
 }
@@ -95,7 +100,7 @@ for (const [firstDay, expected] of [[0, 0], [1, 1], ["auto", 2]]) {
 for (const [hour12, preference, expected] of [["auto", "24", /14:30/], ["auto", "12", /0?2:30.*PM/i], [false, "12", /14:30/], [true, "24", /0?2:30.*PM/i]]) {
   test(`hour12 ${hour12} with HA ${preference} is consistent in every view and details`, async ({ page }) => {
     await page.evaluate(({ hour12, preference }) => mountCard({ hour12 }, { time_format: preference }), { hour12, preference });
-    for (const label of ["Day", "Week", "Month", "Two months"]) {
+    for (const label of ["Day", "Week", "Two weeks", "Month", "Two months"]) {
       await page.getByRole("button", { name: label, exact: true }).click();
       await page.evaluate(() => card.calendar.gotoDate("2026-09-15"));
       const event = await visibleEvent(page);
@@ -179,7 +184,7 @@ test("live preferences, reconnect, stale event removal, and source failure", asy
 for (const language of ["sv", "sv-SE"]) {
   test(`Swedish ${language} localizes controls, navigation and event details`, async ({ page }) => {
     await page.evaluate((language) => mountCard({
-      views: ["dayGridDay", "dayGridWeek", "dayGridMonth", "multiMonthTwo", "list"],
+      views: ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo", "list"],
       initialView: "dayGridDay",
     }, { language }), language);
     await expect(page.getByRole("button", { name: "Idag", exact: true })).toBeVisible();
@@ -190,7 +195,7 @@ for (const language of ["sv", "sv-SE"]) {
     await page.getByRole("button", { name: "Förra", exact: true }).click();
     await expect(page.locator("header h2")).toContainText("15 september 2026");
     for (const [label, view] of [
-      ["Vecka", "dayGridWeek"], ["Månad", "dayGridMonth"],
+      ["Vecka", "dayGridWeek"], ["Två veckor", "dayGridTwoWeeks"], ["Månad", "dayGridMonth"],
       ["Två månader", "multiMonthTwo"], ["Program", "list"], ["Dag", "dayGridDay"],
     ]) {
       await page.getByRole("button", { name: label, exact: true }).click();
@@ -263,3 +268,32 @@ test("two-month full-height view uses the tall container", async ({ page }) => {
   }).toBeGreaterThan(calendar.height - 100);
   expect(await page.evaluate(() => card.calendar.view.type)).toBe("multiMonthTwo");
 });
+
+for (const fillHeight of [false, true]) {
+  test(`two weeks keeps two rows of seven days and second-week overflow with fillHeight ${fillHeight}`, async ({ page }) => {
+    await page.evaluate((fillHeight) => mountCard({ initialView: "dayGridTwoWeeks", firstDay: 1, fillHeight }), fillHeight);
+    await expect(page.locator("header h2")).toContainText(/Sep 14\s*–\s*27, 2026/);
+    const days = page.locator(".family-day-cell");
+    await expect(days).toHaveCount(14);
+    await expect(days.first()).toHaveAttribute("aria-label", "September 14, 2026");
+    await expect(days.last()).toHaveAttribute("aria-label", "September 27, 2026");
+    for (const width of [1080, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect(page.locator(".family-day-header")).toHaveCount(7);
+      await expect(days).toHaveCount(14);
+      const [first, seventh, eighth, last] = await Promise.all([0, 6, 7, 13].map((index) => days.nth(index).boundingBox()));
+      expect(seventh.y).toBe(first.y);
+      expect(eighth.y).toBeGreaterThan(first.y);
+      expect(eighth.x).toBe(first.x);
+      expect(last.y).toBe(eighth.y);
+      expect(last.x).toBe(seventh.x);
+      expect(last.x + last.width).toBeLessThanOrEqual(width);
+      expect(await page.evaluate(() => card.calendar.view.type)).toBe("dayGridTwoWeeks");
+    }
+    await expect(page.locator(".family-event").filter({ hasText: "Förskolan stängd" }).first().locator(".event-time")).toHaveCount(0);
+    await expect(page.locator(".family-event").filter({ hasText: "Long timed trip" }).first().locator(".event-time")).toContainText("14:30");
+    await page.screenshot({ path: `test-results/two-weeks-${fillHeight ? "panel" : "normal"}-${test.info().project.name}.png` });
+    await page.getByRole("gridcell", { name: "September 25, 2026", exact: true }).locator(".family-more-link:visible").click();
+    await expect(page.locator(".family-overflow .family-event")).toHaveCount(32);
+  });
+}

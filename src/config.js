@@ -1,5 +1,5 @@
 export const SUPPORTED_VIEWS = Object.freeze([
-  "dayGridDay", "dayGridWeek", "dayGridMonth", "multiMonthTwo", "list",
+  "dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo", "list",
 ]);
 const defaultViews = ["dayGridDay", "dayGridWeek", "dayGridMonth"];
 

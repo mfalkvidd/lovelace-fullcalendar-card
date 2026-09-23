@@ -27,7 +27,7 @@ window.mountCard = async (config = {}, locale = {}) => {
       }))];
     },
   };
-  card.setConfig({ entities: window.entities, views: ["dayGridDay", "dayGridWeek", "dayGridMonth", "multiMonthTwo"], ...config });
+  card.setConfig({ entities: window.entities, views: ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo"], ...config });
   card.hass = window.hass;
   document.querySelector("#container").append(card);
   await card.updateComplete;

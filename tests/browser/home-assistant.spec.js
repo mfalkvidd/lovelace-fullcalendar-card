@@ -39,6 +39,7 @@ test("Home Assistant 2026.1 panel integration", async ({ page }) => {
 
   for (const [label, view, days, months] of [
     ["Day", "dayGridDay", 1, 0], ["Week", "dayGridWeek", 7, 0],
+    ["Two weeks", "dayGridTwoWeeks", 14, 0],
     ["Month", "dayGridMonth", 0, 1], ["Two months", "multiMonthTwo", 0, 2],
   ]) {
     await card.getByRole("button", { name: label, exact: true }).click();

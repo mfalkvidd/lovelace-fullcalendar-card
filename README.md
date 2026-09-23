@@ -1,6 +1,6 @@
 # FullCalendar card for Home Assistant
 
-A family calendar dashboard that combines Home Assistant calendar entities, including Google Calendar entities, into one calendar. Each calendar keeps its own color. Day, Week, Month, and an optional stacked two-month view retain their layout at every card width.
+A family calendar dashboard that combines Home Assistant calendar entities, including Google Calendar entities, into one calendar. Each calendar keeps its own color. Day, Week, Month, and optional two-week and stacked two-month views retain their layout at every card width.
 
 Targets **Home Assistant 2026.1 and later** with current Firefox and Chromium browsers. The source uses Lit 3, FullCalendar 7, and esbuild. The distributed JavaScript includes its dependencies and styles; no CDN is needed.
 
@@ -44,7 +44,7 @@ Configure Google Calendar in Home Assistant first, then use its `calendar.*` ent
 | --- | --- | --- |
 | `type` | Required by HA | `custom:fullcalendar-card` |
 | `entities` | Required | Non-empty array of entity IDs or entity objects (see below). |
-| `views` | `[dayGridDay, dayGridWeek, dayGridMonth]` | Available view types, in selector order. Supported: `dayGridDay`, `dayGridWeek`, `dayGridMonth`, `multiMonthTwo`, `list`. |
+| `views` | `[dayGridDay, dayGridWeek, dayGridMonth]` | Available view types, in selector order. Supported: `dayGridDay`, `dayGridWeek`, `dayGridTwoWeeks`, `dayGridMonth`, `multiMonthTwo`, `list`. |
 | `initialView` | `dayGridMonth` | Initial view. If Month is absent from `views`, defaults to the first configured view. An explicit value must be in `views`. |
 | `firstDay` | `auto` | `0` Sunday, `1` Monday, `2` Tuesday, `3` Wednesday, `4` Thursday, `5` Friday, `6` Saturday, or `auto`. |
 | `displayEventEnd` | `true` | Show the end as well as the start of timed events. An event must have an end time. |
@@ -56,7 +56,7 @@ Automatic first weekday uses `hass.locale.first_weekday` when configured; otherw
 
 Automatic time format follows HA's profile setting: explicit 12/24-hour preference, language preference, or browser system preference. The same choice applies to every view and event details. HA's local/server time-zone preference is also respected. Date labels follow the HA language; time-range punctuation follows locale conventions.
 
-Controls follow the HA language too, including live language changes. Standard labels use FullCalendar's bundled translations. Card-specific labels (such as Two months, Location, and calendar loading errors) support English and Swedish, with English as the fallback for other languages. Swedish (`sv`, including `sv-SE`) shows **Idag | Dag | Vecka | Månad | Två månader**, with **Plats** and **Stäng** in event details. No extra locale download or YAML setting is needed.
+Controls follow the HA language too, including live language changes. Standard labels use FullCalendar's bundled translations. Card-specific labels (such as Two weeks, Two months, Location, and calendar loading errors) support English and Swedish, with English as the fallback for other languages. Swedish (`sv`, including `sv-SE`) shows **Idag | Dag | Vecka | Två veckor | Månad | Två månader** when all these views are configured, with **Plats** and **Stäng** in event details. No extra locale download or YAML setting is needed.
 
 Invalid values fail early with a configuration message; for example, `firstDay: 9`, `initialView: doesNotExist`, and `views: dayGridMonth` are invalid. Use real YAML booleans, not quoted strings.
 
@@ -100,6 +100,7 @@ views:
         views:
           - dayGridDay
           - dayGridWeek
+          - dayGridTwoWeeks
           - dayGridMonth
           - multiMonthTwo
         firstDay: 1
@@ -122,6 +123,23 @@ views:
 ```
 
 The card fills the available panel below HA's header. FullCalendar's container `ResizeObserver` responds to height changes, sidebar changes, and container resizing without changing the active view. Outside a Panel view, `fillHeight` needs a parent with an explicit height. Omit it for normal cards, which grow with their content.
+
+## Two-week view
+
+Add `dayGridTwoWeeks` to `views` to enable the **Two weeks** / **Två veckor** option:
+
+```yaml
+type: custom:fullcalendar-card
+initialView: dayGridTwoWeeks
+views: [dayGridDay, dayGridWeek, dayGridTwoWeeks, dayGridMonth, multiMonthTwo]
+firstDay: auto
+hour12: auto
+entities:
+  - calendar.home_calendar
+  - calendar.work_calendar
+```
+
+Two consecutive weeks appear as two rows of seven days, starting on the configured first weekday. Previous/next moves by two weeks, and Today returns to the current week and the following week. The view keeps all fourteen days when resized and supports `fillHeight: true` in a Panel view. The default selector remains Day, Week, Month; include `dayGridTwoWeeks` explicitly to show the new option.
 
 ## Two-month view
 

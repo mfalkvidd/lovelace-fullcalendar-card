@@ -6,6 +6,7 @@ const english = {
   today: "Today",
   dayGridDay: "Day",
   dayGridWeek: "Week",
+  dayGridTwoWeeks: "Two weeks",
   dayGridMonth: "Month",
   multiMonthTwo: "Two months",
   list: "List",
@@ -21,6 +22,7 @@ const english = {
 // FullCalendar supplies the standard controls; these strings belong to the card.
 const translations = {
   sv: {
+    dayGridTwoWeeks: "Två veckor",
     multiMonthTwo: "Två månader",
     calendar: "Kalender",
     navigation: "Kalendernavigering",

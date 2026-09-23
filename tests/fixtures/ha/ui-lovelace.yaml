@@ -6,7 +6,7 @@ views:
     cards:
       - type: custom:fullcalendar-card
         initialView: dayGridMonth
-        views: [dayGridDay, dayGridWeek, dayGridMonth, multiMonthTwo]
+        views: [dayGridDay, dayGridWeek, dayGridTwoWeeks, dayGridMonth, multiMonthTwo]
         firstDay: 1
         hour12: false
         fillHeight: true

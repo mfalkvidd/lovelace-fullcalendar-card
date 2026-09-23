@@ -110,6 +110,11 @@ export class FullCalendarCard extends LitElement {
       headerToolbar: false,
       height: config.fillHeight ? "100%" : "auto",
       views: {
+        dayGridTwoWeeks: {
+          type: "dayGrid", duration: { weeks: 2 },
+          dateIncrement: { weeks: 2 }, dateAlignment: "week",
+          titleFormat: { year: "numeric", month: "short", day: "numeric" },
+        },
         multiMonthTwo: {
           type: "multiMonth", duration: { months: 2 },
           dateIncrement: { months: 2 }, dateAlignment: "month",
