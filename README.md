@@ -52,7 +52,7 @@ Configure Google Calendar in Home Assistant first, then use its `calendar.*` ent
 | `weekNumberCalculation` | `ISO` | Numbering method: `ISO`, `US`, or `local`. See [Week numbers](#week-numbers). Values are case-sensitive. |
 | `displayEventEnd` | `true` | Show the end as well as the start of timed events. An event must have an end time. |
 | `hour12` | `auto` | `false` for 24-hour time, `true` for 12-hour time, or `auto`. |
-| `fillHeight` | `false` | Fill the height provided by the containing view. Intended for a Panel view. Month grids resize to fit the selected layout. |
+| `fillHeight` | `false` | Fill the available height, capped at the bottom of the screen. Intended for a Panel view. Month grids resize to fit the selected layout. |
 | `theme` | Inherited HA theme | Optional name of a Home Assistant theme, including its active light/dark mode. |
 
 Automatic first weekday uses `hass.locale.first_weekday` when configured; otherwise it uses the HA language's locale week data, with a CLDR fallback for browsers without `Intl.Locale` week information. An explicit YAML weekday always wins, including `firstDay: 0`.
@@ -176,7 +176,7 @@ views:
             eventColor: "#B77AC4"
 ```
 
-The card fills the available panel below HA's header. FullCalendar's container `ResizeObserver` responds to height changes, sidebar changes, and container resizing without changing the active view. Outside a Panel view, `fillHeight` needs a parent with an explicit height. Omit it for normal cards, which grow with their content.
+With `fillHeight: true`, the card fills its container up to the bottom of the visible screen, accounting for its position below HA's header. A smaller parent height is respected; an auto-height parent uses the remaining screen space. Container and viewport observers respond to header, sidebar, and size changes without changing the active view or date. Month grids include their headings and margins within that height, and busy days use `+N more` links. Omit `fillHeight` for normal cards, which grow with their content.
 
 ## Landscape: two months side by side in one card
 
@@ -206,7 +206,7 @@ views:
             eventColor: "#E27D4A"
 ```
 
-For an existing card, add `twoMonthLayout: horizontal`, include `multiMonthTwo` in `views`, and select Two months or set `initialView: multiMonthTwo`. Use `fillHeight: true` when the parent provides a height, such as a Panel view. It gives each horizontal month the full available grid height. Busy days use `+N more` links; clicking an event in either month opens the same details dialog.
+For an existing card, add `twoMonthLayout: horizontal`, include `multiMonthTwo` in `views`, and select Two months or set `initialView: multiMonthTwo`. Use `fillHeight: true` to keep the card within the available screen height, such as in a Panel view. It gives each horizontal month the full available grid height. Busy days use `+N more` links; clicking an event in either month opens the same details dialog.
 
 `twoMonthLayout: vertical` is the default and stacks the months. `horizontal` keeps two columns when resized. This setting affects only Two months; the Two weeks view still shows two rows of seven days in the same card. No additional card or layout plugin is needed.
 
@@ -242,7 +242,7 @@ entities:
   - calendar.work_calendar
 ```
 
-Two complete consecutive months use the selected `twoMonthLayout` (stacked vertically by default). Previous/next moves by one month, updating both grids together; Day, Week, and Month move by one day, week, and month respectively. Today returns to the current period. Without `fillHeight`, each month retains a large grid for readable text. With `fillHeight: true`, vertical months share the height and horizontal months each use the full grid height. Busy days use overflow links; very short cards can scroll vertically. See the [landscape example](#landscape-two-months-side-by-side-in-one-card) for two months beside each other with shared navigation.
+Two complete consecutive months use the selected `twoMonthLayout` (stacked vertically by default). Previous/next moves by one month, updating both grids together; Day, Week, and Month move by one day, week, and month respectively. Today returns to the current period. Without `fillHeight`, each month retains a large grid for readable text. With `fillHeight: true`, vertical months share the height and horizontal months each use the full grid height. Busy days use overflow links so the full-height month grids fit without a calendar scrollbar. See the [landscape example](#landscape-two-months-side-by-side-in-one-card) for two months beside each other with shared navigation.
 
 ## Non-calendar entities
 

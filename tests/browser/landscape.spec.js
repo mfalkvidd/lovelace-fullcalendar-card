@@ -125,3 +125,61 @@ for (const [view, layout] of [["dayGridMonth", "vertical"], ["multiMonthTwo", "v
     }
   });
 }
+
+async function expectCalendarFits(page) {
+  await expect.poll(() => page.evaluate(() => {
+    const root = card.shadowRoot;
+    const calendar = root.querySelector(".calendar-container").getBoundingClientRect();
+    const withinViewport = [card, root.querySelector("ha-card"), root.querySelector("#calendar")]
+      .every((element) => element.getBoundingClientRect().bottom <= innerHeight + 1);
+    const allDaysVisible = [...root.querySelectorAll(".family-day-cell")].every((element) => {
+      const rect = element.getBoundingClientRect();
+      const grid = element.closest(".family-month-body")?.getBoundingClientRect() || calendar;
+      const label = element.querySelector(".family-day-top").getBoundingClientRect();
+      return rect.top >= grid.top - 1 && rect.bottom <= grid.bottom + 1 && rect.height > 0 &&
+        label.top >= rect.top - 1 && label.bottom <= rect.bottom + 1;
+    });
+    const scrollers = [...root.querySelectorAll("*")].filter((element) =>
+      ["auto", "scroll"].includes(getComputedStyle(element).overflowY) &&
+      element.clientHeight > 0 && element.scrollHeight > element.clientHeight + 1);
+    return { withinViewport, allDaysVisible, scrollers: scrollers.length,
+      pageFits: document.documentElement.scrollHeight <= innerHeight + 1 };
+  })).toEqual({ withinViewport: true, allDaysVisible: true, scrollers: 0, pageFits: true });
+}
+
+for (const twoMonthLayout of ["horizontal", "vertical"]) {
+  test(`full-height ${twoMonthLayout} months fit the screen below a header without scrolling`, async ({ page }) => {
+    await page.evaluate((twoMonthLayout) => mountCard({ fillHeight: true, initialView: "multiMonthTwo", twoMonthLayout }), twoMonthLayout);
+    await expectCalendarFits(page);
+    // A header/padding change must be detected without a window resize. An
+    // auto-height parent must also work, rather than requiring a fixed panel.
+    await page.evaluate(() => { document.querySelector("#container").style.cssText = "height:auto;padding-top:64px"; });
+    await expect.poll(() => page.locator("fullcalendar-card").evaluate((el) => el.getBoundingClientRect().top)).toBe(64);
+    await expectCalendarFits(page);
+    for (const [width, height] of [[1280, 720], [1024, 600], [390, 844], [1080, 1920]]) {
+      await page.setViewportSize({ width, height });
+      for (const date of ["2026-08-15", "2026-09-15"]) {
+        await page.evaluate((date) => card.calendar.gotoDate(date), date);
+        await expect(page.locator(".family-day-cell")).toHaveCount(date.includes("08") ? 77 : 70);
+        await expectCalendarFits(page);
+      }
+      await page.locator(".family-month").first().getByRole("gridcell", { name: "September 25, 2026", exact: true }).locator(".family-more-link").click();
+      await expect(page.locator(".family-overflow .family-event")).toHaveCount(32);
+      await page.keyboard.press("Escape");
+    }
+    await page.locator(".family-month").first().getByRole("gridcell", { name: "September 25, 2026", exact: true }).locator(".family-more-link").click();
+    await expect(page.locator(".family-overflow .family-event")).toHaveCount(32);
+    await page.keyboard.press("Escape");
+    // Other fitted grids share the viewport cap and keep their complete ranges.
+    for (const [label, days] of [["Two weeks", 14], ["Month", 35]]) {
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await expect(page.locator(".family-day-cell")).toHaveCount(days);
+      await expectCalendarFits(page);
+    }
+    await page.evaluate(() => { card.remove(); document.querySelector("#container").append(card); });
+    await expectCalendarFits(page);
+    await page.evaluate(() => { document.querySelector("#container").style.paddingTop = "96px"; });
+    await expectCalendarFits(page);
+    expect(await page.evaluate(() => card.calendar.view.type)).toBe("dayGridMonth");
+  });
+}

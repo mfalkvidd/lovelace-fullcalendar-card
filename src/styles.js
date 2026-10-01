@@ -24,7 +24,12 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
     --fc-classic-small-dot-width: 8px;
     --fc-classic-large-dot-width: 10px;
   }
-  :host([fill-height]) { height: 100%; min-height: 0; }
+  :host([fill-height]) {
+    height: var(--calendar-available-height, 100dvh);
+    max-height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+  }
   ha-card {
     display: flex;
     flex-direction: column;
@@ -83,11 +88,48 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   .family-day-number { margin-inline-start: auto; }
   .family-month-header { font-weight: 500; }
   .family-month-body { min-height: 600px; }
-  /* Size grids from the available height, with one or two rows of months.
-     An explicit height overrides the width-driven aspect ratio used by FullCalendar. */
+  /* The view's content box excludes its borders. Each month gets one or half
+     of that height, including its margins; flex layout measures the headings. */
+  :host([fill-height]) .family-month-view { container-type: size; }
+  :host([fill-height]) .family-month {
+    height: calc(50cqh - 32px);
+    min-height: 0;
+    margin: 16px;
+    container: month / size;
+  }
+  :host([fill-height]) .family-month-horizontal { height: calc(100cqh - 32px); }
   :host([fill-height]) .family-month-header { padding-block: 2px; }
-  :host([fill-height]) .family-month-body { min-height: 180px; height: calc(50cqh - 4rem); }
-  :host([fill-height]) .family-month-body-horizontal { height: calc(100cqh - 4rem); }
+  :host([fill-height]) .family-month-header,
+  :host([fill-height]) .family-month-table-header { flex-shrink: 0; }
+  :host([fill-height]) .family-month-table,
+  :host([fill-height]) .family-month-body { flex: 1; min-height: 0; }
+  /* Hidden event measurement elements must not enlarge the scrollable area.
+     FullCalendar keeps visible events in the grid and exposes the rest via +N. */
+  :host([fill-height]) .family-month-body { height: 0; overflow: clip; }
+  /* FullCalendar reserves overlapping space for sticky headings in stacked
+     months. In a fitted grid the headings stay in normal flow instead. */
+  :host([fill-height]) .family-month-header,
+  :host([fill-height]) .family-month-table,
+  :host([fill-height]) .family-month-table-header,
+  :host([fill-height]) .family-month-body { margin-block: 0 !important; }
+  :host([fill-height]) .family-month-header,
+  :host([fill-height]) .family-month-table-header { position: static; }
+  @container month (max-height: 250px) {
+    /* Short stacked months keep dates and overflow links on the same line,
+       leaving all weeks visible instead of enforcing a taller date row. */
+    .family-day-top { margin-block: 0; padding-block: 0; gap: 1px; flex-wrap: nowrap; font-size: 12px; line-height: 1.2; }
+    .family-more-link {
+      position: absolute !important;
+      z-index: 5;
+      bottom: 0;
+      inset-inline-start: 2px;
+      max-width: calc(100% - 22px);
+      font-size: 10px;
+      line-height: 1.1;
+    }
+    .family-more-link-inner { font-size: inherit; line-height: inherit; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .family-day-cell:has(.family-week-number) .family-more-link { inset-inline-start: 25%; max-width: calc(75% - 22px); }
+  }
   .family-overflow { max-width: min(420px, 90vw); }
   .errors { color: var(--error-color, #b00020); font-size: 0.9rem; }
   .errors p { margin: 0 0 8px; }

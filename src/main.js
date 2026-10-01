@@ -36,6 +36,20 @@ export class FullCalendarCard extends LitElement {
     this._hiddenCalendars = new Set();
     this._sourceRequests = new Map();
     this._themeKeys = [];
+    this._scheduleHeightUpdate = () => {
+      if (this._heightFrame !== undefined) return;
+      this._heightFrame = requestAnimationFrame(() => {
+        this._heightFrame = undefined;
+        if (!this._config?.fillHeight || !this.isConnected) return;
+        const viewport = window.visualViewport;
+        const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+        const top = Math.max(viewport?.offsetTop || 0, this.getBoundingClientRect().top);
+        const height = `${Math.max(0, Math.floor(bottom - top))}px`;
+        if (this.style.getPropertyValue("--calendar-available-height") !== height) {
+          this.style.setProperty("--calendar-available-height", height);
+        }
+      });
+    };
   }
 
   setConfig(config) {
@@ -55,6 +69,17 @@ export class FullCalendarCard extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.requestUpdate();
+    this._heightObserver = new ResizeObserver(this._scheduleHeightUpdate);
+    // Observe containing layouts too: HA can move the card when its header or
+    // sidebar changes without resizing the browser window.
+    for (let element = this; element; element = element.parentElement || element.getRootNode().host) {
+      this._heightObserver.observe(element, { box: "border-box" });
+    }
+    window.addEventListener("resize", this._scheduleHeightUpdate);
+    window.addEventListener("scroll", this._scheduleHeightUpdate, true);
+    window.visualViewport?.addEventListener("resize", this._scheduleHeightUpdate);
+    window.visualViewport?.addEventListener("scroll", this._scheduleHeightUpdate);
+    this._scheduleHeightUpdate();
     // Calendar entities may change future events without changing their current state.
     this._refreshTimer = setInterval(() => {
       if (!document.hidden) this.calendar?.refetchEvents();
@@ -64,6 +89,13 @@ export class FullCalendarCard extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     clearInterval(this._refreshTimer);
+    this._heightObserver?.disconnect();
+    window.removeEventListener("resize", this._scheduleHeightUpdate);
+    window.removeEventListener("scroll", this._scheduleHeightUpdate, true);
+    window.visualViewport?.removeEventListener("resize", this._scheduleHeightUpdate);
+    window.visualViewport?.removeEventListener("scroll", this._scheduleHeightUpdate);
+    cancelAnimationFrame(this._heightFrame);
+    this._heightFrame = undefined;
     this._savedView = this.calendar?.view.type;
     this._savedDate = this.calendar?.getDate();
     this.calendar?.destroy();
@@ -102,8 +134,9 @@ export class FullCalendarCard extends LitElement {
       }
       this._applyTheme();
     }
-    // FullCalendar 7 observes its containers with ResizeObserver. destroy() releases
-    // those observers; no window resize listener or deprecated updateSize() is needed.
+    // Cap the host at the viewport bottom. FullCalendar's own ResizeObserver
+    // then resizes the grid without rebuilding it or changing navigation.
+    this._scheduleHeightUpdate();
   }
 
   _createCalendar() {
@@ -131,6 +164,7 @@ export class FullCalendarCard extends LitElement {
           titleFormat: { year: "numeric", month: "short", day: "numeric" },
         },
         multiMonthTwo: {
+          viewClass: "family-month-view",
           type: "multiMonth", duration: { months: 2 },
           dateIncrement: { months: 1 }, dateAlignment: "month",
           fixedWeekCount: false,
@@ -168,11 +202,15 @@ export class FullCalendarCard extends LitElement {
         day.textContent = info.text;
         return { domNodes: [week, day] };
       },
-      singleMonthClass: "family-month",
+      singleMonthClass: ({ multiMonthColumns }) =>
+        `family-month${multiMonthColumns === 2 ? " family-month-horizontal" : ""}`,
+      tableClass: ({ multiMonthColumns }) => multiMonthColumns ? "family-month-table" : "",
+      tableHeaderClass: ({ multiMonthColumns }) => multiMonthColumns ? "family-month-table-header" : "",
       singleMonthHeaderClass: "family-month-header",
       tableBodyClass: ({ multiMonthColumns }) => multiMonthColumns
         ? `family-month-body${multiMonthColumns === 2 ? " family-month-body-horizontal" : ""}` : "",
       moreLinkClass: "family-more-link",
+      moreLinkInnerClass: "family-more-link-inner",
       popoverClass: "family-overflow",
       eventContent: (info) => {
         // FullCalendar owns the time range and all-day semantics. Only wrap its text for readability.

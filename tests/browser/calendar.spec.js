@@ -153,7 +153,11 @@ test("displayEventEnd false retains start time and complete details", async ({ p
 });
 
 test("container-only resizing fills available height without changing views", async ({ page }) => {
-  await page.evaluate(() => mountCard({ fillHeight: true, initialView: "dayGridWeek" }));
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  await page.evaluate(() => {
+    document.querySelector("#container").style.height = "600px";
+    return mountCard({ fillHeight: true, initialView: "dayGridWeek" });
+  });
   const calendar = page.locator("#calendar");
   const initial = await calendar.boundingBox();
   await page.evaluate(() => Object.assign(document.querySelector("#container").style, { width: "600px", height: "1000px" }));
