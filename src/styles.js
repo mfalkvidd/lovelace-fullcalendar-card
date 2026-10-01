@@ -130,6 +130,9 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
     .family-more-link-inner { font-size: inherit; line-height: inherit; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .family-day-cell:has(.family-week-number) .family-more-link { inset-inline-start: 25%; max-width: calc(75% - 22px); }
   }
+  /* List keeps its usual scrolling/all-events behavior. A quiet day has room
+     for time placement; a busy day still grows to contain its complete list. */
+  :host([time-based-layout]) .family-list-day-body { min-height: 320px; }
   .family-overflow { max-width: min(420px, 90vw); }
   .errors { color: var(--error-color, #b00020); font-size: 0.9rem; }
   .errors p { margin: 0 0 8px; }

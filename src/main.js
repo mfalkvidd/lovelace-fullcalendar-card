@@ -12,6 +12,7 @@ import { resolvePreferences, eventTimeFormat, formatEventDetails } from "./forma
 import { getLabels } from "./localize.js";
 import { createWeekNumberCalculation } from "./week-numbers.js";
 import { styles } from "./styles.js";
+import { TimeBasedLayout, eventTimePlacement, timeBasedEventOrder } from "./time-layout.js";
 
 const previousPath = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
 const nextPath = "M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z";
@@ -43,8 +44,11 @@ export class FullCalendarCard extends LitElement {
         if (!this._config?.fillHeight || !this.isConnected) return;
         const viewport = window.visualViewport;
         const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
-        const top = Math.max(viewport?.offsetTop || 0, this.getBoundingClientRect().top);
-        const height = `${Math.max(0, Math.floor(bottom - top))}px`;
+        const bounds = this.getBoundingClientRect();
+        const top = Math.max(viewport?.offsetTop || 0, bounds.top);
+        const layoutHeight = Number.parseFloat(getComputedStyle(this).height);
+        const scale = layoutHeight > 0 && bounds.height > 0 ? bounds.height / layoutHeight : 1;
+        const height = `${Math.max(0, Math.floor((bottom - top) / scale))}px`;
         if (this.style.getPropertyValue("--calendar-available-height") !== height) {
           this.style.setProperty("--calendar-available-height", height);
         }
@@ -60,6 +64,7 @@ export class FullCalendarCard extends LitElement {
     this._savedDate = undefined;
     this.renderRoot?.querySelector("dialog")?.close();
     this.toggleAttribute("fill-height", this._config.fillHeight);
+    this.toggleAttribute("time-based-layout", this._config.timeBasedLayout);
   }
 
   set hass(value) { this._hass = value; }
@@ -98,6 +103,8 @@ export class FullCalendarCard extends LitElement {
     this._heightFrame = undefined;
     this._savedView = this.calendar?.view.type;
     this._savedDate = this.calendar?.getDate();
+    this._timeLayout?.destroy();
+    this._timeLayout = undefined;
     this.calendar?.destroy();
     this.calendar = undefined;
     this._sourceRequests.clear();
@@ -110,6 +117,8 @@ export class FullCalendarCard extends LitElement {
     const preferencesChanged = JSON.stringify(preferences) !== JSON.stringify(this._preferences);
     this._preferences = preferences;
     if (changed.has("_config") && this.calendar) {
+      this._timeLayout?.destroy();
+      this._timeLayout = undefined;
       this.calendar.destroy();
       this.calendar = undefined;
       this._savedView = undefined;
@@ -137,6 +146,7 @@ export class FullCalendarCard extends LitElement {
     // Cap the host at the viewport bottom. FullCalendar's own ResizeObserver
     // then resizes the grid without rebuilding it or changing navigation.
     this._scheduleHeightUpdate();
+    this._timeLayout?.schedule();
   }
 
   _createCalendar() {
@@ -178,6 +188,7 @@ export class FullCalendarCard extends LitElement {
       // Disable FullCalendar's own narrow-day event collapse as well as the old card breakpoint.
       dayNarrowWidth: 0,
       eventDisplay: "block",
+      ...(config.timeBasedLayout ? { eventOrder: timeBasedEventOrder, eventOrderStrict: true } : {}),
       eventInteractive: true,
       displayEventEnd: config.displayEventEnd,
       eventTimeFormat: eventTimeFormat(preferences.hour12),
@@ -189,7 +200,9 @@ export class FullCalendarCard extends LitElement {
       dayCellClass: ({ isOther, inPopover, view }) =>
         `family-day-cell${isOther && !inPopover && ["dayGridMonth", "multiMonthTwo"].includes(view.type)
           ? " family-other-month" : ""}`,
+      dayCellTopClass: "family-day-heading",
       dayCellTopInnerClass: "family-day-top",
+      listDayBodyClass: "family-list-day-body",
       dayCellTopContent: (info) => {
         if (!config.weekNumbers || info.inPopover || info.dow !== this._preferences.firstDay ||
             !["dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo"].includes(info.view.type)) return info.text;
@@ -233,6 +246,11 @@ export class FullCalendarCard extends LitElement {
         const title = document.createElement("span");
         title.className = "event-title";
         title.textContent = info.event.title;
+        if (config.timeBasedLayout) {
+          const placement = eventTimePlacement(info.event);
+          title.dataset.timeBand = placement.band;
+          title.dataset.startMinute = placement.minute;
+        }
         nodes.push(title);
         return { domNodes: nodes };
       },
@@ -273,6 +291,7 @@ export class FullCalendarCard extends LitElement {
       })),
     });
     this.calendar.render();
+    if (config.timeBasedLayout) this._timeLayout = new TimeBasedLayout(this.renderRoot.querySelector("#calendar"));
   }
 
   _toggleCalendar(index) {

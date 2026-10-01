@@ -10,7 +10,7 @@ npx playwright install --with-deps chromium firefox
 npm run test:browser
 ```
 
-For an interactive preview, run `node tests/server.js` and open `http://localhost:8085/`. It opens a single card with two horizontal months and shared navigation. The server disables caching and refreshes the fixture and bundle module URLs on restart. `/?preview=default` opens the default Month configuration used by regression tests.
+For an interactive preview, run `node tests/server.js` and open `http://localhost:8085/`. It opens a single card with two horizontal months, shared navigation, and `timeBasedLayout: true`. The server disables caching and refreshes the fixture and bundle module URLs on restart. `/?preview=default` opens the default Month configuration used by regression tests. `/?preview=time` demonstrates `timeBasedLayout: true` in Two weeks, with early, daytime, and evening sample events; switch views to see the same mode elsewhere.
 
 The standalone fixture runs the **production bundle** with a controlled `hass` object, four event sources, and no HA custom elements. This also exercises accessible native-button fallbacks. It does not impersonate the HA frontend. Tests run in Chromium and Firefox, in the Europe/Stockholm timezone, with landscape and portrait viewports and container-only size changes.
 
@@ -21,6 +21,8 @@ Calendar toggles are checked in every view, including List, with keyboard operat
 Week-number checks cover ISO, US, and locale-based rules across New Year in all four supported views, including narrow screens and both months of Two months. They also cover disabling numbers, keeping Day/List free of numbers, independent grid-weekday settings, live locale/weekday/time-zone changes, and rendering inside HA. Unit cases include week 53, leap years, daylight-saving changes, and extreme time-zone offsets.
 
 The landscape fixture uses one card with `twoMonthLayout: horizontal`. It checks 1280×720, 1920×1080, 2560×1440, narrow screens, and container-only resizing with normal and full-height cards. It verifies a single toolbar and filter row, side-by-side month grids, natural four/five/six-week month ranges with Sunday or Monday first, week numbers, shared month-by-month navigation across New Year and Today, filters affecting both months, right-pane event details, overflow, and Swedish controls. These checks run against the production bundle in the standalone fixture.
+
+Time-based layout checks cover all six views, both Two months layouts, the 07:00/18:00 boundaries, the 12:30 midpoint, and collision-free placement. They verify that crowded days retain native overflow counts and popovers in normal and full-height cards, and exercise keyboard details, resizing, navigation, calendar filters, timezone changes, reconnection, editing an event into an all-day event, and disabling the mode. Unit tests also cover exclusive midnight ends, offsets/daylight saving, equal start times, and variable event heights.
 
 ## Actual Home Assistant 2026.1.3 frontend
 
@@ -58,6 +60,10 @@ The setup script refuses a partly or fully onboarded instance. It writes ignored
 An isolated Python 3.13.2+ environment with `homeassistant==2026.1.3` can also run this configuration. It needs HA's integration requirements and system dependencies (including libturbojpeg). This is the method used during implementation, with frontend `20260107.2`.
 
 ## Recorded validation
+
+On 2026-10-01, the follow-up spacing fix passed **42 targeted browser checks** in Chromium and Firefox. New regressions reproduce four simultaneous 14:30 events, verify their group stays below the midpoint with wrapped text, restore placement after native inline-style replacement, and cover scaled rendering without extending the card below the screen. The main preview now enables the mode, and `/?preview=time&view=dayGridWeek` opens the matching Week example. The corrected preview was visually checked; the rebuilt `/tmp/lovelace-fullcalendar-card-latest.zip` was verified byte for byte and `git diff --check` passed. Actual HA integration was not rerun.
+
+On 2026-10-01, `timeBasedLayout` passed **55 unit tests** and **108 standalone browser checks** in Chromium and Firefox. The 20 new browser checks cover placement in every view, both month layouts, unchanged native overflow, interactions, resizing, and live updates. The preview was checked visually and stayed within the viewport at 1920×1080, 1280×720, and 390×844. The 4 actual HA integration checks were skipped because `HA_URL` was not set. The production bundle was rebuilt, `/tmp/lovelace-fullcalendar-card-latest.zip` was verified byte for byte, and `git diff --check` passed.
 
 On 2026-10-01, viewport fitting passed **88 standalone browser checks** in Chromium and Firefox. New regressions verify that full-height horizontal and stacked months have no calendar/page scrollbar and keep every date label inside its own grid, including six-week months, a header above the card, container-only changes, resizing, view changes, and reconnection. Busy-day links remain usable at each tested size. The live preview and compact layouts were also checked visually. The 4 actual HA integration checks were skipped because `HA_URL` was not set. The production bundle and installation ZIPs were rebuilt and checked byte for byte; `git diff --check` passed.
 

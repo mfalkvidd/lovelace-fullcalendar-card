@@ -35,7 +35,7 @@ export function normalizeConfig(config) {
   if (hour12 !== "auto" && typeof hour12 !== "boolean") {
     invalid("hour12 must be auto, true, or false.");
   }
-  for (const key of ["displayEventEnd", "fillHeight", "weekNumbers"]) {
+  for (const key of ["displayEventEnd", "fillHeight", "weekNumbers", "timeBasedLayout"]) {
     if (config[key] !== undefined && typeof config[key] !== "boolean") {
       invalid(`${key} must be true or false.`);
     }
@@ -63,6 +63,7 @@ export function normalizeConfig(config) {
     ...config, entities, firstDay, hour12, views: [...views], initialView,
     displayEventEnd: config.displayEventEnd ?? true,
     fillHeight: config.fillHeight ?? false,
+    timeBasedLayout: config.timeBasedLayout ?? false,
     weekNumbers: config.weekNumbers ?? true,
     weekNumberCalculation,
     twoMonthLayout,

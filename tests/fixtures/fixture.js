@@ -34,7 +34,16 @@ window.mountCard = async (config = {}, locale = {}) => {
   card.calendar.gotoDate("2026-09-15");
   await card.updateComplete;
 };
-const previewConfig = new URLSearchParams(window.location.search).get("preview") !== "default"
-  ? { initialView: "multiMonthTwo", twoMonthLayout: "horizontal", fillHeight: true }
+const preview = new URLSearchParams(window.location.search).get("preview");
+if (preview === "time") {
+  for (const [time, summary] of [["06:30", "Early swim"], ["09:00", "Morning appointment"], ["12:30", "Lunch"], ["16:00", "Afternoon activity"], ["19:30", "Evening appointment"]]) {
+    eventData.push({ summary, start: { dateTime: `2026-09-18T${time}:00+02:00` }, end: { dateTime: `2026-09-18T${time.slice(0, 2)}:45:00+02:00` } });
+  }
+}
+const requestedView = new URLSearchParams(window.location.search).get("view");
+const previewView = ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo"].includes(requestedView)
+  ? requestedView : preview === "time" ? "dayGridTwoWeeks" : "multiMonthTwo";
+const previewConfig = preview !== "default"
+  ? { initialView: previewView, twoMonthLayout: "horizontal", fillHeight: true, timeBasedLayout: true }
   : {};
 await mountCard(previewConfig);

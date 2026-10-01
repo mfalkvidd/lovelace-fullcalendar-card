@@ -11,6 +11,7 @@ test("old calendar YAML and string entities retain sensible defaults", () => {
   assert.equal(config.hour12, "auto");
   assert.equal(config.displayEventEnd, true);
   assert.equal(config.fillHeight, false);
+  assert.equal(config.timeBasedLayout, false);
   assert.equal(config.twoMonthLayout, "vertical");
   assert.equal(config.weekNumbers, true);
   assert.equal(config.weekNumberCalculation, "ISO");
@@ -27,6 +28,7 @@ for (const [key, value] of [
   ["firstDay", 9], ["firstDay", -1], ["firstDay", 1.5], ["firstDay", "1"],
   ["hour12", "false"], ["displayEventEnd", "true"], ["fillHeight", 1],
   ["weekNumbers", "false"], ["weekNumbers", 1],
+  ["timeBasedLayout", "true"], ["timeBasedLayout", 1],
   ["twoMonthLayout", "auto"], ["twoMonthLayout", "sideways"], ["twoMonthLayout", 2], ["twoMonthLayout", true],
   ["weekNumberCalculation", "iso"], ["weekNumberCalculation", "unknown"], ["weekNumberCalculation", false],
   ["initialView", "doesNotExist"], ["views", "dayGridMonth"], ["views", []],
@@ -61,4 +63,9 @@ test("both two-month layouts preserve the configured view", () => {
     assert.equal(config.twoMonthLayout, twoMonthLayout);
     assert.equal(config.initialView, "multiMonthTwo");
   }
+});
+
+test("time-based layout is explicitly opt-in", () => {
+  assert.equal(normalizeConfig({ ...basic, timeBasedLayout: true }).timeBasedLayout, true);
+  assert.equal(normalizeConfig({ ...basic, timeBasedLayout: false }).timeBasedLayout, false);
 });

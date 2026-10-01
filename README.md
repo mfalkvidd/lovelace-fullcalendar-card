@@ -25,7 +25,7 @@ The root bundle and its filename are retained for [HACS Dashboard installation](
 
 ### Manual installation
 
-Copy `lovelace-fullcalendar-card.js` to `/config/www/` and register `/local/lovelace-fullcalendar-card.js` as a JavaScript module resource. Reload the browser after upgrades. Do not load both the manual and HACS resources.
+Copy `lovelace-fullcalendar-card.js` to `/config/www/` and register `/local/lovelace-fullcalendar-card.js` as a JavaScript module resource. After replacing the file, change the version query on the existing resource URL (for example `/local/lovelace-fullcalendar-card.js?v=2`) and reload the dashboard so the browser loads the new bundle. Do not add a second resource entry or load both the manual and HACS resources.
 
 ## Basic calendar
 
@@ -37,6 +37,8 @@ entities:
 ```
 
 Configure Google Calendar in Home Assistant first, then use its `calendar.*` entities here. The card reads HA's calendar API; it does not need Google credentials.
+
+To spread events through each day by start time, add `timeBasedLayout: true` to the card configuration. See [Time-based day layout](#time-based-day-layout) for the full example and placement rules.
 
 ## Options
 
@@ -52,6 +54,7 @@ Configure Google Calendar in Home Assistant first, then use its `calendar.*` ent
 | `weekNumberCalculation` | `ISO` | Numbering method: `ISO`, `US`, or `local`. See [Week numbers](#week-numbers). Values are case-sensitive. |
 | `displayEventEnd` | `true` | Show the end as well as the start of timed events. An event must have an end time. |
 | `hour12` | `auto` | `false` for 24-hour time, `true` for 12-hour time, or `auto`. |
+| `timeBasedLayout` | `false` | Place events within each day by start time, with all-day/multi-day events first, early events at the top and late events at the bottom. See [Time-based day layout](#time-based-day-layout). |
 | `fillHeight` | `false` | Fill the available height, capped at the bottom of the screen. Intended for a Panel view. Month grids resize to fit the selected layout. |
 | `theme` | Inherited HA theme | Optional name of a Home Assistant theme, including its active light/dark mode. |
 
@@ -138,6 +141,31 @@ firstDay: auto
 To hide week numbers in all views, set `weekNumbers: false`. For example, January 1, 2021 is ISO week **53**, but US week **1**. January 4 is ISO week **1**, but US week **2**. These boundary cases are covered by the tests.
 
 The card uses FullCalendar's week-number formatting and [local calculation](https://fullcalendar.io/docs/weekNumberCalculation), with separate ISO/US calculations to keep those explicit rules independent of the grid's first weekday. Numbers remain visible on narrow screens.
+
+## Time-based day layout
+
+Enable this optional layout with:
+
+```yaml
+type: custom:fullcalendar-card
+timeBasedLayout: true
+fillHeight: true
+entities:
+  - calendar.family
+```
+
+In every view (Day, Week, Two weeks, Month, both Two months layouts, and List), each day is arranged as follows:
+
+- All-day events and events spanning multiple calendar dates stay at the top, retaining their spanning bars in the grid views.
+- Other events starting before **07:00** follow them, ordered by start time.
+- Events starting after **18:00** sit at the bottom, ordered by start time.
+- Events starting from **07:00 through 18:00**, inclusive, use the space between those groups. Their vertical centers follow their start times on that scale, with **12:30 at the midpoint** of the remaining space. Event blocks keep their normal text height; duration does not control block height.
+
+Nearby or simultaneous events move just enough to avoid overlapping, while preserving start-time order. The layout uses the same time zone as the displayed event times. A timed event ending exactly at midnight belongs to the preceding day because calendar end times are exclusive.
+
+Crowded days keep the existing event limits and **+N more** popups; all events remain available there. Placement applies to the visible events, and popups retain their usual compact list. List view keeps its existing scrolling and shows all events; quiet days have at least 320 pixels of space for positioning. Calendar filters, colors, event details, and shared navigation work as usual.
+
+`timeBasedLayout` defaults to `false`. It also works without `fillHeight`, using the day cells' normal available space. Enable `fillHeight: true` for a wall display so the layout can use the screen height.
 
 ## Multiple calendars in a full-height panel
 
