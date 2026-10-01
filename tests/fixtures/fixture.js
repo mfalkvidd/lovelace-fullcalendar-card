@@ -34,4 +34,7 @@ window.mountCard = async (config = {}, locale = {}) => {
   card.calendar.gotoDate("2026-09-15");
   await card.updateComplete;
 };
-await mountCard();
+const previewConfig = new URLSearchParams(window.location.search).get("preview") !== "default"
+  ? { initialView: "multiMonthTwo", twoMonthLayout: "horizontal", fillHeight: true }
+  : {};
+await mountCard(previewConfig);

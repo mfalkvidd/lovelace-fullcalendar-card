@@ -37,6 +37,7 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding-bottom: 12px; }
   h2 { font-size: 1.25rem; font-weight: 500; margin: 0; }
   header h2 { flex: 1; text-align: center; }
+  header .family-week-number-header { display: block; font-size: 0.8em; color: var(--secondary-text-color, #727272); }
   .navigation, .views { display: flex; align-items: center; gap: 4px; }
   .views { flex-wrap: wrap; }
   .calendars { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 12px; }
@@ -68,9 +69,16 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   .event-time { font-weight: 600; margin-inline-end: 0.35em; }
   .event-title { white-space: normal; }
   .family-day-header { font-size: 0.85em; }
+  .family-day-top { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; width: 100%; box-sizing: border-box; }
+  .family-week-number { margin-inline-end: auto; font-size: 0.85em; font-weight: 600; color: var(--secondary-text-color, #727272); }
+  .family-day-number { margin-inline-start: auto; }
   .family-month-header { font-weight: 500; }
   .family-month-body { min-height: 600px; }
-  :host([fill-height]) .family-month-body { min-height: max(600px, calc(50cqh - 4.25rem)); }
+  /* Size grids from the available height, with one or two rows of months.
+     An explicit height overrides the width-driven aspect ratio used by FullCalendar. */
+  :host([fill-height]) .family-month-header { padding-block: 2px; }
+  :host([fill-height]) .family-month-body { min-height: 180px; height: calc(50cqh - 4rem); }
+  :host([fill-height]) .family-month-body-horizontal { height: calc(100cqh - 4rem); }
   .family-overflow { max-width: min(420px, 90vw); }
   .errors { color: var(--error-color, #b00020); font-size: 0.9rem; }
   .errors p { margin: 0 0 8px; }

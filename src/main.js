@@ -10,6 +10,7 @@ import { CalendarService, calendarName } from "./data.js";
 import { normalizeConfig } from "./config.js";
 import { resolvePreferences, eventTimeFormat, formatEventDetails } from "./format.js";
 import { getLabels } from "./localize.js";
+import { createWeekNumberCalculation } from "./week-numbers.js";
 import { styles } from "./styles.js";
 
 const previousPath = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
@@ -20,6 +21,7 @@ export class FullCalendarCard extends LitElement {
     _config: { state: true },
     _hass: { state: true },
     _title: { state: true },
+    _weekTitle: { state: true },
     _activeView: { state: true },
     _selectedEvent: { state: true },
     _errors: { state: true },
@@ -89,6 +91,7 @@ export class FullCalendarCard extends LitElement {
         this.calendar.setOption("locale", preferences.language);
         this.calendar.setOption("firstDay", preferences.firstDay);
         this.calendar.setOption("timeZone", preferences.timeZone);
+        this.calendar.setOption("weekNumberCalculation", createWeekNumberCalculation(this._config.weekNumberCalculation, preferences.timeZone));
         this.calendar.setOption("eventTimeFormat", eventTimeFormat(preferences.hour12));
       });
     }
@@ -113,6 +116,9 @@ export class FullCalendarCard extends LitElement {
       locale: preferences.language,
       firstDay: preferences.firstDay,
       timeZone: preferences.timeZone,
+      // Render through public content hooks so numbers also appear in narrow cells.
+      weekNumbers: false,
+      weekNumberCalculation: createWeekNumberCalculation(config.weekNumberCalculation, preferences.timeZone),
       initialView: this._savedView || config.initialView,
       ...(this._savedDate ? { initialDate: this._savedDate } : {}),
       headerToolbar: false,
@@ -125,11 +131,14 @@ export class FullCalendarCard extends LitElement {
         },
         multiMonthTwo: {
           type: "multiMonth", duration: { months: 2 },
-          dateIncrement: { months: 2 }, dateAlignment: "month",
+          dateIncrement: { months: 1 }, dateAlignment: "month",
+          fixedWeekCount: config.twoMonthLayout === "horizontal",
         },
         list: { type: "list", duration: { weeks: 1 } },
       },
-      multiMonthMaxColumns: 1,
+      multiMonthMaxColumns: config.twoMonthLayout === "horizontal" ? 2 : 1,
+      // Keep the explicitly chosen layout even when the containing card narrows.
+      singleMonthMinWidth: 1,
       singleMonthTitleFormat: { month: "long", year: "numeric" },
       // Disable FullCalendar's own narrow-day event collapse as well as the old card breakpoint.
       dayNarrowWidth: 0,
@@ -143,9 +152,23 @@ export class FullCalendarCard extends LitElement {
       eventInnerClass: "family-event-inner",
       dayHeaderClass: "family-day-header",
       dayCellClass: "family-day-cell",
+      dayCellTopInnerClass: "family-day-top",
+      dayCellTopContent: (info) => {
+        if (!config.weekNumbers || info.inPopover || info.dow !== this._preferences.firstDay ||
+            !["dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo"].includes(info.view.type)) return info.text;
+        const week = document.createElement("span");
+        week.className = "family-week-number";
+        week.textContent = this.calendar.formatDate(info.date, { week: "narrow" });
+        week.title = this.calendar.formatDate(info.date, { week: "long" });
+        const day = document.createElement("span");
+        day.className = "family-day-number";
+        day.textContent = info.text;
+        return { domNodes: [week, day] };
+      },
       singleMonthClass: "family-month",
       singleMonthHeaderClass: "family-month-header",
-      tableBodyClass: ({ multiMonthColumns }) => multiMonthColumns ? "family-month-body" : "",
+      tableBodyClass: ({ multiMonthColumns }) => multiMonthColumns
+        ? `family-month-body${multiMonthColumns === 2 ? " family-month-body-horizontal" : ""}` : "",
       moreLinkClass: "family-more-link",
       popoverClass: "family-overflow",
       eventContent: (info) => {
@@ -176,6 +199,8 @@ export class FullCalendarCard extends LitElement {
       datesSet: ({ view }) => {
         this._title = view.title;
         this._activeView = view.type;
+        // FullCalendar omits inline week numbers when DayGrid has only one row.
+        this._weekTitle = this.calendar.formatDate(view.currentStart, { week: "long" });
       },
       eventSources: config.entities.map((entity, index) => ({
         id: `${entity.entity}-${index}`,
@@ -277,7 +302,10 @@ export class FullCalendarCard extends LitElement {
             ${this._button(labels.today, () => this.calendar?.today())}
             ${this._navigationButton(labels.next, nextPath, () => this.calendar?.next())}
           </div>
-          <h2 aria-live="polite">${this._title || labels.calendar}</h2>
+          <h2 aria-live="polite">${this._title || labels.calendar}
+            ${this._config.weekNumbers && this._activeView === "dayGridWeek"
+              ? html`<span class="family-week-number-header">${this._weekTitle}</span>` : nothing}
+          </h2>
           <div class="views" role="group" aria-label=${labels.view}>
             ${this._config.views.map((view) => this._button(labels[view],
               () => this.calendar?.changeView(view), this._activeView === view))}

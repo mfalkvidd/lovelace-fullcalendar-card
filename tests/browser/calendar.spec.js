@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   page.testErrors = errors;
-  await page.goto("/");
+  await page.goto("/?preview=default");
   await expect(page.locator(".family-event").first()).toBeVisible();
 });
 test.afterEach(async ({ page }) => { expect(page.testErrors).toEqual([]); });
@@ -38,7 +38,7 @@ test("navigation, fixed view selection, and readable events", async ({ page }) =
 for (const [view, label, days, months] of [
   ["dayGridDay", "Day", 1, 0], ["dayGridWeek", "Week", 7, 0],
   ["dayGridTwoWeeks", "Two weeks", 14, 0],
-  ["dayGridMonth", "Month", 0, 1], ["multiMonthTwo", "Two months", 0, 2],
+  ["dayGridMonth", "Month", 0, 1], ["multiMonthTwo", "Two months", 0, 1],
 ]) {
   test(`${label}: navigation interval, initialView and readable narrow times`, async ({ page }) => {
     await page.evaluate((initialView) => mountCard({ initialView, firstDay: 1 }), view);
@@ -390,4 +390,83 @@ test("calendar toggles ignore stale requests and clear errors for hidden calenda
   await expect(page.getByRole("alert")).toContainText("Unable to load Person 1: current failure");
   await person.click();
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+const visibleWeekNumbers = (page) => page.locator(".family-week-number:visible, .family-week-number-header:visible");
+
+for (const [method, language, firstDay, firstWeek] of [
+  ["ISO", "en", 1, 53], ["US", "sv", 0, 1],
+  ["local", "en", 0, 53], ["local", "sv", 1, 53],
+]) {
+  test(`week numbers ${method} with ${language} cover all four views across New Year`, async ({ page }) => {
+    await page.evaluate(({ method, language, firstDay }) => mountCard({ weekNumberCalculation: method, firstDay }, { language }), { method, language, firstDay });
+    for (const view of ["dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo"]) {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.evaluate((view) => {
+        card.calendar.changeView(view);
+        card.calendar.gotoDate("2021-01-01");
+      }, view);
+      const numbers = visibleWeekNumbers(page);
+      const rowCount = (await page.locator(".family-day-cell").count()) / 7;
+      await expect(numbers).toHaveCount(rowCount);
+      await expect(numbers.first()).toContainText(String(firstWeek));
+      if (view === "dayGridTwoWeeks") await expect(numbers.nth(1)).toContainText(firstWeek === 53 ? "1" : "2");
+      if (view === "multiMonthTwo") {
+        await expect(page.locator(".family-month").nth(1).locator(".family-week-number:visible").first()).toContainText(firstWeek === 53 ? "5" : "6");
+      }
+      expect(await page.evaluate(() => card.calendar.getOption("firstDay"))).toBe(firstDay);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(numbers).toHaveCount(rowCount);
+      await expect(numbers.first()).toBeVisible();
+    }
+    await page.screenshot({ path: `test-results/week-numbers-${method}-${language}-${test.info().project.name}.png` });
+  });
+}
+
+test("week numbers can be disabled and remain absent from Day and List", async ({ page }) => {
+  await page.evaluate(() => mountCard({ weekNumbers: false, views: ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo", "list"] }));
+  for (const view of ["dayGridDay", "dayGridWeek", "dayGridTwoWeeks", "dayGridMonth", "multiMonthTwo", "list"]) {
+    await page.evaluate((view) => card.calendar.changeView(view), view);
+    await expect(visibleWeekNumbers(page)).toHaveCount(0);
+  }
+  await page.evaluate(() => mountCard({ weekNumbers: true, views: ["dayGridDay", "list"] }));
+  for (const view of ["dayGridDay", "list"]) {
+    await page.evaluate((view) => card.calendar.changeView(view), view);
+    await expect(visibleWeekNumbers(page)).toHaveCount(0);
+  }
+});
+
+test("explicit numbering stays independent of language and grid first weekday", async ({ page }) => {
+  for (const [method, firstDay, expected] of [["ISO", 0, 52], ["US", 1, 1]]) {
+    await page.evaluate(async ({ method, firstDay }) => {
+      await mountCard({ initialView: "dayGridWeek", weekNumberCalculation: method, firstDay });
+      card.calendar.gotoDate("2021-01-01");
+    }, { method, firstDay });
+    await expect(visibleWeekNumbers(page).first()).toContainText(String(expected));
+    await page.evaluate(() => { card.hass = { ...card.hass, locale: { ...card.hass.locale, language: "sv" } }; });
+    await expect(visibleWeekNumbers(page).first()).toContainText(String(expected));
+    expect(await page.evaluate(() => card.calendar.view.currentStart.getDay())).toBe(firstDay);
+  }
+  await page.evaluate(async () => {
+    await mountCard({ initialView: "dayGridWeek", weekNumberCalculation: "local" }, { language: "en", first_weekday: "sunday" });
+    card.calendar.gotoDate("2021-01-03");
+  });
+  await expect(visibleWeekNumbers(page).first()).toContainText("1");
+  await page.evaluate(() => { card.hass = { ...card.hass, locale: { ...card.hass.locale, language: "sv", first_weekday: "monday" } }; });
+  await expect(visibleWeekNumbers(page).first()).toContainText("53");
+});
+
+test("ISO week numbers follow live server time-zone changes at the week-year boundary", async ({ page }) => {
+  await page.evaluate(() => mountCard({ initialView: "dayGridWeek", firstDay: 1 }));
+  for (const timeZone of ["Pacific/Kiritimati", "America/Los_Angeles", "Europe/Stockholm"]) {
+    await page.evaluate(async (timeZone) => {
+      card.hass = { ...card.hass, config: { ...card.hass.config, time_zone: timeZone }, locale: { ...card.hass.locale, time_zone: "server" } };
+      await card.updateComplete;
+      card.calendar.gotoDate("2021-01-04");
+    }, timeZone);
+    await expect(visibleWeekNumbers(page)).toHaveCount(1);
+    await expect(visibleWeekNumbers(page)).toHaveText(/\D*1/);
+    await page.getByRole("button", { name: "Previous", exact: true }).click();
+    await expect(visibleWeekNumbers(page)).toContainText("53");
+  }
 });

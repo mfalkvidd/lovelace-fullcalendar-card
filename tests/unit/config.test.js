@@ -11,6 +11,9 @@ test("old calendar YAML and string entities retain sensible defaults", () => {
   assert.equal(config.hour12, "auto");
   assert.equal(config.displayEventEnd, true);
   assert.equal(config.fillHeight, false);
+  assert.equal(config.twoMonthLayout, "vertical");
+  assert.equal(config.weekNumbers, true);
+  assert.equal(config.weekNumberCalculation, "ISO");
   assert.equal(config.entities[0].eventColor, "green");
   assert.equal(normalizeConfig({ entities: ["sensor.meeting"] }).entities[0].entity, "sensor.meeting");
   assert.equal(basic.entities[0].name, undefined);
@@ -23,6 +26,9 @@ test("custom order, custom initial view, and first-only fallback", () => {
 for (const [key, value] of [
   ["firstDay", 9], ["firstDay", -1], ["firstDay", 1.5], ["firstDay", "1"],
   ["hour12", "false"], ["displayEventEnd", "true"], ["fillHeight", 1],
+  ["weekNumbers", "false"], ["weekNumbers", 1],
+  ["twoMonthLayout", "auto"], ["twoMonthLayout", "sideways"], ["twoMonthLayout", 2], ["twoMonthLayout", true],
+  ["weekNumberCalculation", "iso"], ["weekNumberCalculation", "unknown"], ["weekNumberCalculation", false],
   ["initialView", "doesNotExist"], ["views", "dayGridMonth"], ["views", []],
   ["views", ["unknown"]], ["views", ["dayGridDay", "dayGridDay"]],
   ["entities", [null]], ["entities", [{}]], ["entities", []],
@@ -37,5 +43,22 @@ test("all numeric weekdays including Sunday and boolean false are preserved", ()
     assert.equal(config.firstDay, firstDay);
     assert.equal(config.hour12, false);
     assert.equal(config.displayEventEnd, false);
+  }
+});
+
+test("week numbers can be disabled and each numbering method preserves the requested weekday", () => {
+  for (const weekNumberCalculation of ["ISO", "US", "local"]) {
+    const config = normalizeConfig({ ...basic, weekNumbers: false, weekNumberCalculation, firstDay: 0 });
+    assert.equal(config.weekNumbers, false);
+    assert.equal(config.weekNumberCalculation, weekNumberCalculation);
+    assert.equal(config.firstDay, 0);
+  }
+});
+
+test("both two-month layouts preserve the configured view", () => {
+  for (const twoMonthLayout of ["vertical", "horizontal"]) {
+    const config = normalizeConfig({ ...basic, twoMonthLayout, initialView: "multiMonthTwo", views: ["multiMonthTwo"] });
+    assert.equal(config.twoMonthLayout, twoMonthLayout);
+    assert.equal(config.initialView, "multiMonthTwo");
   }
 });

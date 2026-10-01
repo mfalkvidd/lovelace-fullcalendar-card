@@ -1,6 +1,6 @@
 # FullCalendar card for Home Assistant
 
-A family calendar dashboard that combines Home Assistant calendar entities, including Google Calendar entities, into one calendar. Each calendar keeps its own color. Day, Week, Month, and optional two-week and stacked two-month views retain their layout at every card width.
+A family calendar dashboard that combines Home Assistant calendar entities, including Google Calendar entities, into one calendar. Each calendar keeps its own color. Day, Week, Month, and optional two-week and two-month views retain their selected layout at every card width.
 
 Targets **Home Assistant 2026.1 and later** with current Firefox and Chromium browsers. The source uses Lit 3, FullCalendar 7, and esbuild. The distributed JavaScript includes its dependencies and styles; no CDN is needed.
 
@@ -46,10 +46,13 @@ Configure Google Calendar in Home Assistant first, then use its `calendar.*` ent
 | `entities` | Required | Non-empty array of entity IDs or entity objects (see below). |
 | `views` | `[dayGridDay, dayGridWeek, dayGridMonth]` | Available view types, in selector order. Supported: `dayGridDay`, `dayGridWeek`, `dayGridTwoWeeks`, `dayGridMonth`, `multiMonthTwo`, `list`. |
 | `initialView` | `dayGridMonth` | Initial view. If Month is absent from `views`, defaults to the first configured view. An explicit value must be in `views`. |
+| `twoMonthLayout` | `vertical` | Layout inside the Two months view: `vertical` stacks the months; `horizontal` puts them side by side in one card with shared controls. |
 | `firstDay` | `auto` | `0` Sunday, `1` Monday, `2` Tuesday, `3` Wednesday, `4` Thursday, `5` Friday, `6` Saturday, or `auto`. |
+| `weekNumbers` | `true` | Show week numbers in Week, Two weeks, Month, and Two months. Day and List never show them. |
+| `weekNumberCalculation` | `ISO` | Numbering method: `ISO`, `US`, or `local`. See [Week numbers](#week-numbers). Values are case-sensitive. |
 | `displayEventEnd` | `true` | Show the end as well as the start of timed events. An event must have an end time. |
 | `hour12` | `auto` | `false` for 24-hour time, `true` for 12-hour time, or `auto`. |
-| `fillHeight` | `false` | Fill the height provided by the containing view. Intended for a Panel view. |
+| `fillHeight` | `false` | Fill the height provided by the containing view. Intended for a Panel view. Month grids resize to fit the selected layout. |
 | `theme` | Inherited HA theme | Optional name of a Home Assistant theme, including its active light/dark mode. |
 
 Automatic first weekday uses `hass.locale.first_weekday` when configured; otherwise it uses the HA language's locale week data, with a CLDR fallback for browsers without `Intl.Locale` week information. An explicit YAML weekday always wins, including `firstDay: 0`.
@@ -91,6 +94,51 @@ entities:
 
 Week always means seven `dayGridWeek` columns, including on portrait displays. A timed event shows a range such as `14:30–16:00 Simskola`; all-day events show only their title. Details always include full start/end dates and times when available, even with `displayEventEnd: false`.
 
+## Week numbers
+
+Week numbers are shown by default in Week (`dayGridWeek`), Two weeks (`dayGridTwoWeeks`), Month (`dayGridMonth`), and Two months (`multiMonthTwo`). In Week, the number appears below the date heading; the other views show a number at each week's row, including rows crossing a month or year boundary. Day and List do not show week numbers.
+
+Choose the calculation with `weekNumberCalculation`:
+
+| Value | Numbering rules | Suggested grid setting |
+| --- | --- | --- |
+| `ISO` (default) | ISO 8601: Monday starts the week; week 1 contains January 4 (the year's first Thursday). Early January can belong to week 52 or 53 of the previous week-year. | `firstDay: 1` |
+| `US` | Sunday starts the week; week 1 contains January 1. Late December can belong to week 1 of the following week-year. This is not the zero-based `%U` system. | `firstDay: 0` |
+| `local` | FullCalendar's rules for the HA language, together with the effective `firstDay`. For example, Swedish with Monday first uses ISO-style numbering. Changing the HA language or first weekday updates the numbers. | `firstDay: auto` |
+
+`ISO` and `US` are explicit numbering systems, independent of the interface language and `firstDay`. `firstDay` still controls the grid's column order, including HA's profile preference when set to `auto`. The number on a row describes its **first date**. If the grid starts on a different weekday from the numbering system, the row can span two numbered weeks; use the matching settings above for the usual layout. Calculations use the calendar's selected time zone.
+
+For Swedish/ISO weeks, even with HA set to English:
+
+```yaml
+type: custom:fullcalendar-card
+entities:
+  - calendar.home_calendar
+views: [dayGridDay, dayGridWeek, dayGridTwoWeeks, dayGridMonth, multiMonthTwo]
+initialView: dayGridTwoWeeks
+weekNumbers: true
+weekNumberCalculation: ISO
+firstDay: 1
+```
+
+For US numbering, change these two settings:
+
+```yaml
+weekNumberCalculation: US
+firstDay: 0
+```
+
+To follow the HA language and weekday preference:
+
+```yaml
+weekNumberCalculation: local
+firstDay: auto
+```
+
+To hide week numbers in all views, set `weekNumbers: false`. For example, January 1, 2021 is ISO week **53**, but US week **1**. January 4 is ISO week **1**, but US week **2**. These boundary cases are covered by the tests.
+
+The card uses FullCalendar's week-number formatting and [local calculation](https://fullcalendar.io/docs/weekNumberCalculation), with separate ISO/US calculations to keep those explicit rules independent of the grid's first weekday. Numbers remain visible on narrow screens.
+
 ## Multiple calendars in a full-height panel
 
 This is dashboard YAML. A Panel view contains one card:
@@ -130,6 +178,38 @@ views:
 
 The card fills the available panel below HA's header. FullCalendar's container `ResizeObserver` responds to height changes, sidebar changes, and container resizing without changing the active view. Outside a Panel view, `fillHeight` needs a parent with an explicit height. Omit it for normal cards, which grow with their content.
 
+## Landscape: two months side by side in one card
+
+Set `twoMonthLayout: horizontal` to show one complete month on the left and the next month on the right. Both grids belong to **one card and one calendar instance**: they share a single Previous/Today/Next toolbar, view selector, calendar filters, and event-details dialog.
+
+Previous/Next shifts the pair by **one month**. For example, September–October becomes October–November with Next, and Previous returns to September–October. Today shows the current month and the following month. The same navigation applies to the vertical layout.
+
+For a landscape display, this **dashboard YAML** uses a Panel view so the single card fills the available screen. Replace the entities with your own:
+
+```yaml
+views:
+  - title: Calendar
+    path: calendar
+    type: panel
+    cards:
+      - type: custom:fullcalendar-card
+        initialView: multiMonthTwo
+        views: [dayGridDay, dayGridWeek, dayGridTwoWeeks, dayGridMonth, multiMonthTwo]
+        twoMonthLayout: horizontal
+        fillHeight: true
+        firstDay: 1
+        hour12: false
+        entities:
+          - entity: calendar.home_calendar
+            eventColor: "#4A90E2"
+          - entity: calendar.work_calendar
+            eventColor: "#E27D4A"
+```
+
+For an existing card, add `twoMonthLayout: horizontal`, include `multiMonthTwo` in `views`, and select Two months or set `initialView: multiMonthTwo`. Use `fillHeight: true` when the parent provides a height, such as a Panel view. It gives each horizontal month the full available grid height. Busy days use `+N more` links; clicking an event in either month opens the same details dialog.
+
+`twoMonthLayout: vertical` is the default and stacks the months. `horizontal` keeps two columns when resized, with six aligned week rows per month. This choice affects only Two months; the Two weeks view still shows two rows of seven days in the same card. No additional card or layout plugin is needed.
+
 ## Two-week view
 
 Add `dayGridTwoWeeks` to `views` to enable the **Two weeks** / **Två veckor** option:
@@ -160,7 +240,7 @@ entities:
   - calendar.work_calendar
 ```
 
-Two complete consecutive months are stacked vertically. Previous/next moves by two months; Day, Week, and Month move by one day, week, and month respectively. Today returns to the current period. The two-month view can scroll vertically; each month retains enough height for readable text instead of shrinking both grids to fit a short card.
+Two complete consecutive months use the selected `twoMonthLayout` (stacked vertically by default). Previous/next moves by one month, updating both grids together; Day, Week, and Month move by one day, week, and month respectively. Today returns to the current period. Without `fillHeight`, each month retains a large grid for readable text. With `fillHeight: true`, vertical months share the height and horizontal months each use the full grid height. Busy days use overflow links; very short cards can scroll vertically. See the [landscape example](#landscape-two-months-side-by-side-in-one-card) for two months beside each other with shared navigation.
 
 ## Non-calendar entities
 
@@ -182,6 +262,7 @@ A timestamp sensor uses its state as the date. Other entities use `attributes.la
 ## Migration and limitations
 
 - Existing `entities`, `name`, `eventColor`, `time_list_attribute`, and `theme` configurations are preserved. The custom element and resource filename are unchanged.
+- Two months now advances one month per Previous/Next click, so adjacent periods overlap (September–October → October–November).
 - Month remains the initial view. The default selector order is now **Day | Week | Month**. Resizing never selects another view. Add `list` explicitly if you want the optional seven-day list.
 - End times are now on by default; set `displayEventEnd: false` for start-only display. Automatic time formatting replaces the old forced 24-hour grid and inconsistent popup formatting.
 - Calendar all-day ends remain exclusive. For example, September 17 through an exclusive September 20 spans September 17–19. Long timed events are no longer incorrectly classified as all-day.

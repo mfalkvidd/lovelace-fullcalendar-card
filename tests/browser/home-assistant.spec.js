@@ -51,11 +51,14 @@ test("Home Assistant 2026.1 panel integration", async ({ page }) => {
   for (const [label, view, days, months] of [
     ["Day", "dayGridDay", 1, 0], ["Week", "dayGridWeek", 7, 0],
     ["Two weeks", "dayGridTwoWeeks", 14, 0],
-    ["Month", "dayGridMonth", 0, 1], ["Two months", "multiMonthTwo", 0, 2],
+    ["Month", "dayGridMonth", 0, 1], ["Two months", "multiMonthTwo", 0, 1],
   ]) {
     await card.getByRole("button", { name: label, exact: true }).click();
     await card.evaluate((element) => element.calendar.gotoDate("2026-09-15"));
     expect(await card.evaluate((element) => element.calendar.view.type)).toBe(view);
+    const weekNumbers = card.locator(".family-week-number:visible, .family-week-number-header:visible");
+    if (view === "dayGridDay") await expect(weekNumbers).toHaveCount(0);
+    else await expect(weekNumbers.first()).toContainText(view === "dayGridWeek" || view === "dayGridTwoWeeks" ? "38" : "36");
     const expected = await card.evaluate((element, { days, months }) => {
       const date = new Date(element.calendar.view.currentStart);
       if (months) date.setMonth(date.getMonth() + months);

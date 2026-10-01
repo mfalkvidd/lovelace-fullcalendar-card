@@ -10,11 +10,17 @@ npx playwright install --with-deps chromium firefox
 npm run test:browser
 ```
 
+For an interactive preview, run `node tests/server.js` and open `http://localhost:8085/`. It opens a single card with two horizontal months and shared navigation. The server disables caching and refreshes the fixture and bundle module URLs on restart. `/?preview=default` opens the default Month configuration used by regression tests.
+
 The standalone fixture runs the **production bundle** with a controlled `hass` object, four event sources, and no HA custom elements. This also exercises accessible native-button fallbacks. It does not impersonate the HA frontend. Tests run in Chromium and Firefox, in the Europe/Stockholm timezone, with landscape and portrait viewports and container-only size changes.
 
 Coverage includes Day/Week/Two weeks/Month/Two months; navigation and Today; all configured weekday modes; HA and explicit 12/24-hour choices; start/end times; all-day exclusive ends; multi-day timed events; distinct source colors; overflow; event details; live preferences; reconnect; refresh/deletion; unavailable calendars; text escaping; and fixed seven-column Week views. Two-week checks also verify two rows of seven days in landscape and portrait, normal and full-height cards, and access to second-week events through overflow. Swedish and `sv-SE` checks cover every control (including List), accessible labels, event details, and live language changes with an open dialog or existing loading errors.
 
 Calendar toggles are checked in every view, including List, with keyboard operation and all calendars hidden. Tests verify that hidden calendars make no API requests, remain hidden across navigation/preferences/reconnection, fetch fresh events when restored, and ignore stale responses or errors after toggling. HA integration checks also verify the accessible pressed state of the native toggle buttons alongside HA's navigation and view controls.
+
+Week-number checks cover ISO, US, and locale-based rules across New Year in all four supported views, including narrow screens and both months of Two months. They also cover disabling numbers, keeping Day/List free of numbers, independent grid-weekday settings, live locale/weekday/time-zone changes, and rendering inside HA. Unit cases include week 53, leap years, daylight-saving changes, and extreme time-zone offsets.
+
+The landscape fixture uses one card with `twoMonthLayout: horizontal`. It checks 1280×720, 1920×1080, 2560×1440, narrow screens, and container-only resizing with normal and full-height cards. It verifies a single toolbar and filter row, aligned month grids, week numbers, shared month-by-month navigation across New Year and Today, filters affecting both months, right-pane event details, overflow, and Swedish controls. These checks run against the production bundle in the standalone fixture.
 
 ## Actual Home Assistant 2026.1.3 frontend
 
@@ -53,6 +59,8 @@ An isolated Python 3.13.2+ environment with `homeassistant==2026.1.3` can also r
 
 ## Recorded validation
 
-On 2026-09-23, the calendar toggles were validated with **29 unit tests** and **60 browser checks**: 56 standalone checks and 4 actual Home Assistant integration checks. The full suite passed. After switching the toggles to native buttons so their pressed state reaches the focusable control, all 18 affected filtering, layout, and HA integration checks passed again. Chromium 153 and Firefox 155 were used against Home Assistant 2026.1.3 (frontend 20260107.2), as well as the standalone fixture. The production bundle was rebuilt, the installation ZIP was checked against it byte for byte, and `git diff --check` passed. Screenshots and traces are written under ignored `test-results/`; test-account data stays under ignored `.test-ha/`.
+On 2026-09-29, the single-card horizontal-month layout passed **44 unit tests** and **78 standalone browser checks** in Chromium and Firefox. The eight new layout checks cover shared navigation, both panes' filters and details, resizing, and normal/full-height layouts. All existing standalone checks passed with the new one-month navigation interval. The 4 actual HA integration checks were skipped because the disposable HA runtime was unavailable and `HA_URL` was not set. The production bundle and installation ZIP were rebuilt and checked byte for byte; `git diff --check` passed.
+
+On 2026-09-25, week numbers were validated with **39 passing unit tests** and **74 browser checks**: 70 standalone checks and 4 actual Home Assistant integration checks. The full browser run passed 73 checks; one Chromium HA check completed its functional assertions but reported `Transition was skipped. New ViewTransition started`. That check passed unchanged on rerun. After the final layout adjustment, all 28 selected week-number, layout, and HA checks passed in Chromium and Firefox. The HA instance used version 2026.1.3 (frontend 20260107.2). The production bundle was rebuilt, the installation ZIP was checked against it byte for byte, and `git diff --check` passed. Screenshots and traces are written under ignored `test-results/`; test-account data stays under ignored `.test-ha/`.
 
 Google OAuth/synchronization and the HACS download UI are not exercised by these browser tests. HACS metadata points to the rebuilt root bundle. Future HA versions, physical wall displays, and older kiosk browser engines require their own validation.

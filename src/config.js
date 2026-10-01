@@ -35,10 +35,18 @@ export function normalizeConfig(config) {
   if (hour12 !== "auto" && typeof hour12 !== "boolean") {
     invalid("hour12 must be auto, true, or false.");
   }
-  for (const key of ["displayEventEnd", "fillHeight"]) {
+  for (const key of ["displayEventEnd", "fillHeight", "weekNumbers"]) {
     if (config[key] !== undefined && typeof config[key] !== "boolean") {
       invalid(`${key} must be true or false.`);
     }
+  }
+  const weekNumberCalculation = config.weekNumberCalculation ?? "ISO";
+  if (!["ISO", "US", "local"].includes(weekNumberCalculation)) {
+    invalid("weekNumberCalculation must be ISO, US, or local.");
+  }
+  const twoMonthLayout = config.twoMonthLayout ?? "vertical";
+  if (!["vertical", "horizontal"].includes(twoMonthLayout)) {
+    invalid("twoMonthLayout must be vertical or horizontal.");
   }
   const views = config.views ?? defaultViews;
   if (!Array.isArray(views) || !views.length ||
@@ -55,5 +63,8 @@ export function normalizeConfig(config) {
     ...config, entities, firstDay, hour12, views: [...views], initialView,
     displayEventEnd: config.displayEventEnd ?? true,
     fillHeight: config.fillHeight ?? false,
+    weekNumbers: config.weekNumbers ?? true,
+    weekNumberCalculation,
+    twoMonthLayout,
   };
 }
