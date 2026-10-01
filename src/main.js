@@ -152,7 +152,9 @@ export class FullCalendarCard extends LitElement {
       eventClass: "family-event",
       eventInnerClass: "family-event-inner",
       dayHeaderClass: "family-day-header",
-      dayCellClass: "family-day-cell",
+      dayCellClass: ({ isOther, inPopover, view }) =>
+        `family-day-cell${isOther && !inPopover && ["dayGridMonth", "multiMonthTwo"].includes(view.type)
+          ? " family-other-month" : ""}`,
       dayCellTopInnerClass: "family-day-top",
       dayCellTopContent: (info) => {
         if (!config.weekNumbers || info.inPopover || info.dow !== this._preferences.firstDay ||

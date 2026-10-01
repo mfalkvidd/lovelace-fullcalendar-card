@@ -59,6 +59,8 @@ An isolated Python 3.13.2+ environment with `homeassistant==2026.1.3` can also r
 
 ## Recorded validation
 
+On 2026-10-01, adjacent-month shading passed **14 existing month-layout browser checks** in Chromium and Firefox. Additional interactive checks verified the exact September/October 2026 boundary dates, light and dark themes, event clicks, overflow popovers, both Two months layouts, and the single Month view. Day, Week, and Two weeks remain unshaded. The production bundle was rebuilt and the installation ZIPs were checked byte for byte.
+
 On 2026-10-01, removing forced six-week padding passed **84 standalone browser checks** in Chromium and Firefox. New regressions verify natural four/five/six-week ranges in Month and both Two months layouts with Sunday and Monday starts, including September 2026 ending on October 4 when Monday is first. The running localhost preview was also checked directly. The 4 actual HA integration checks were skipped because `HA_URL` was not set. The production bundle was rebuilt, installation ZIPs were checked byte for byte, and `git diff --check` passed.
 
 On 2026-09-29, the single-card horizontal-month layout passed **44 unit tests** and **78 standalone browser checks** in Chromium and Firefox. The eight new layout checks cover shared navigation, both panes' filters and details, resizing, and normal/full-height layouts. All existing standalone checks passed with the new one-month navigation interval. The 4 actual HA integration checks were skipped because the disposable HA runtime was unavailable and `HA_URL` was not set. The production bundle and installation ZIP were rebuilt and checked byte for byte; `git diff --check` passed.

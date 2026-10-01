@@ -69,6 +69,15 @@ export const styles = [unsafeCSS(skeleton), unsafeCSS(classic), css`
   .event-time { font-weight: 600; margin-inline-end: 0.35em; }
   .event-title { white-space: normal; }
   .family-day-header { font-size: 0.85em; }
+  .family-other-month { position: relative; }
+  .family-other-month::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(128, 128, 128, 0.22);
+    z-index: 6;
+    pointer-events: none;
+  }
   .family-day-top { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; width: 100%; box-sizing: border-box; }
   .family-week-number { margin-inline-end: auto; font-size: 0.85em; font-weight: 600; color: var(--secondary-text-color, #727272); }
   .family-day-number { margin-inline-start: auto; }
