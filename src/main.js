@@ -124,6 +124,7 @@ export class FullCalendarCard extends LitElement {
       headerToolbar: false,
       height: config.fillHeight ? "100%" : "auto",
       views: {
+        dayGridMonth: { fixedWeekCount: false },
         dayGridTwoWeeks: {
           type: "dayGrid", duration: { weeks: 2 },
           dateIncrement: { weeks: 2 }, dateAlignment: "week",
@@ -132,7 +133,7 @@ export class FullCalendarCard extends LitElement {
         multiMonthTwo: {
           type: "multiMonth", duration: { months: 2 },
           dateIncrement: { months: 1 }, dateAlignment: "month",
-          fixedWeekCount: config.twoMonthLayout === "horizontal",
+          fixedWeekCount: false,
         },
         list: { type: "list", duration: { weeks: 1 } },
       },

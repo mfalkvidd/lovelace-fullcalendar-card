@@ -208,7 +208,9 @@ views:
 
 For an existing card, add `twoMonthLayout: horizontal`, include `multiMonthTwo` in `views`, and select Two months or set `initialView: multiMonthTwo`. Use `fillHeight: true` when the parent provides a height, such as a Panel view. It gives each horizontal month the full available grid height. Busy days use `+N more` links; clicking an event in either month opens the same details dialog.
 
-`twoMonthLayout: vertical` is the default and stacks the months. `horizontal` keeps two columns when resized, with six aligned week rows per month. This choice affects only Two months; the Two weeks view still shows two rows of seven days in the same card. No additional card or layout plugin is needed.
+`twoMonthLayout: vertical` is the default and stacks the months. `horizontal` keeps two columns when resized. This setting affects only Two months; the Two weeks view still shows two rows of seven days in the same card. No additional card or layout plugin is needed.
+
+Month and Two months show four, five, or six week rows as needed. Every row contains at least one day from its month. Partial first/last weeks still include dates from adjacent months. For September 2026 with Monday first, the last row is September 28–October 4; there is no extra October 5–11 row.
 
 ## Two-week view
 

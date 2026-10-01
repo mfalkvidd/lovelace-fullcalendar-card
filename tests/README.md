@@ -20,7 +20,7 @@ Calendar toggles are checked in every view, including List, with keyboard operat
 
 Week-number checks cover ISO, US, and locale-based rules across New Year in all four supported views, including narrow screens and both months of Two months. They also cover disabling numbers, keeping Day/List free of numbers, independent grid-weekday settings, live locale/weekday/time-zone changes, and rendering inside HA. Unit cases include week 53, leap years, daylight-saving changes, and extreme time-zone offsets.
 
-The landscape fixture uses one card with `twoMonthLayout: horizontal`. It checks 1280×720, 1920×1080, 2560×1440, narrow screens, and container-only resizing with normal and full-height cards. It verifies a single toolbar and filter row, aligned month grids, week numbers, shared month-by-month navigation across New Year and Today, filters affecting both months, right-pane event details, overflow, and Swedish controls. These checks run against the production bundle in the standalone fixture.
+The landscape fixture uses one card with `twoMonthLayout: horizontal`. It checks 1280×720, 1920×1080, 2560×1440, narrow screens, and container-only resizing with normal and full-height cards. It verifies a single toolbar and filter row, side-by-side month grids, natural four/five/six-week month ranges with Sunday or Monday first, week numbers, shared month-by-month navigation across New Year and Today, filters affecting both months, right-pane event details, overflow, and Swedish controls. These checks run against the production bundle in the standalone fixture.
 
 ## Actual Home Assistant 2026.1.3 frontend
 
@@ -58,6 +58,8 @@ The setup script refuses a partly or fully onboarded instance. It writes ignored
 An isolated Python 3.13.2+ environment with `homeassistant==2026.1.3` can also run this configuration. It needs HA's integration requirements and system dependencies (including libturbojpeg). This is the method used during implementation, with frontend `20260107.2`.
 
 ## Recorded validation
+
+On 2026-10-01, removing forced six-week padding passed **84 standalone browser checks** in Chromium and Firefox. New regressions verify natural four/five/six-week ranges in Month and both Two months layouts with Sunday and Monday starts, including September 2026 ending on October 4 when Monday is first. The running localhost preview was also checked directly. The 4 actual HA integration checks were skipped because `HA_URL` was not set. The production bundle was rebuilt, installation ZIPs were checked byte for byte, and `git diff --check` passed.
 
 On 2026-09-29, the single-card horizontal-month layout passed **44 unit tests** and **78 standalone browser checks** in Chromium and Firefox. The eight new layout checks cover shared navigation, both panes' filters and details, resizing, and normal/full-height layouts. All existing standalone checks passed with the new one-month navigation interval. The 4 actual HA integration checks were skipped because the disposable HA runtime was unavailable and `HA_URL` was not set. The production bundle and installation ZIP were rebuilt and checked byte for byte; `git diff --check` passed.
 

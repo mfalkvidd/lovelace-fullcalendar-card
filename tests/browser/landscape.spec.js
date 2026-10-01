@@ -21,7 +21,7 @@ for (const fillHeight of [false, true]) {
       await page.setViewportSize({ width, height });
       await expect(months).toHaveCount(2);
       await expect(page.locator(".family-day-header")).toHaveCount(14);
-      await expect(page.locator(".family-week-number")).toHaveCount(12);
+      await expect(page.locator(".family-week-number")).toHaveCount(10);
       await expect.poll(async () => {
         const [left, right] = await Promise.all([months.nth(0).boundingBox(), months.nth(1).boundingBox()]);
         return Math.abs(left.y - right.y) < 1 && left.x + left.width <= right.x + 1 &&
@@ -97,3 +97,31 @@ test("one calendar filter applies to both months and right-pane events open shar
   await page.getByRole("button", { name: "Nästa", exact: true }).click();
   await expect(page.locator(".family-month-header")).toHaveText(["oktober 2026", "november 2026"]);
 });
+
+for (const [view, layout] of [["dayGridMonth", "vertical"], ["multiMonthTwo", "vertical"], ["multiMonthTwo", "horizontal"]]) {
+  test(`${view} ${layout} only includes weeks containing days from its month`, async ({ page }) => {
+    for (const firstDay of [0, 1]) {
+      await page.evaluate(({ view, layout, firstDay }) => mountCard({ initialView: view, twoMonthLayout: layout, firstDay }), { view, layout, firstDay });
+      for (const [date, counts, lastDates] of [
+        ["2026-09-15", [35, 35], ["2026-10-03", "2026-10-04"]],
+        ["2021-02-15", [35, 28], ["2021-03-06", "2021-02-28"]],
+        ["2026-08-15", [42, 42], ["2026-09-05", "2026-09-06"]],
+      ]) {
+        await page.evaluate((date) => card.calendar.gotoDate(date), date);
+        const grids = view === "dayGridMonth" ? page.locator("#calendar") : page.locator(".family-month");
+        const days = grids.first().locator(".family-day-cell");
+        await expect(days).toHaveCount(counts[firstDay]);
+        await expect(days.last()).toHaveAttribute("data-date", lastDates[firstDay]);
+        if (view === "multiMonthTwo") await expect(grids.nth(1).locator(".family-day-cell")).toHaveCount(35);
+        // Partial boundary weeks remain, but no whole row belongs to another month.
+        const rowsContainMonth = await grids.evaluateAll((elements, firstMonth) => elements.flatMap((element) => {
+          const month = element.dataset.date || firstMonth;
+          const dates = [...element.querySelectorAll(".family-day-cell")].map((cell) => cell.dataset.date);
+          return Array.from({ length: dates.length / 7 }, (_, row) =>
+            dates.slice(row * 7, row * 7 + 7).some((day) => day.startsWith(month)));
+        }), date.slice(0, 7));
+        expect(rowsContainMonth.every(Boolean)).toBe(true);
+      }
+    }
+  });
+}
