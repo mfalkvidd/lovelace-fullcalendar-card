@@ -75,7 +75,7 @@ Invalid values fail early with a configuration message; for example, `firstDay: 
 | `eventColor` | `#3788d8` | CSS color for this entity's events; quote hexadecimal colors in YAML. |
 | `time_list_attribute` | None | For non-calendar entities, an attribute containing an array of date/time strings. |
 
-Calendar event titles come from the events, not the entity's `name`. Calendar failures are shown in the card; other calendars can still load. Events refresh on navigation, relevant entity changes, and every minute while the page is visible. Upstream Google Calendar synchronization still depends on the HA integration.
+Calendar event titles come from the events, not the entity's `name`. Calendar failures are shown in the card; other calendars can still load. Events refresh on navigation and relevant entity changes. While the page is visible, the card checks each minute for changes and redraws only calendars whose events changed. Upstream Google Calendar synchronization still depends on the HA integration.
 
 ## Show or hide calendars
 

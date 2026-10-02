@@ -152,6 +152,27 @@ test('four simultaneous afternoon events stay below the midpoint through scaling
   await expectAfternoonSpacing(page);
 });
 
+test('minute refresh keeps unchanged event nodes and updates changed calendar data', async ({ page }) => {
+  await page.evaluate(() => mountCard({ initialView: 'dayGridWeek', fillHeight: true, timeBasedLayout: true }));
+  await expectAfternoonSpacing(page);
+  const stable = await page.evaluate(async () => {
+    const event = [...card.shadowRoot.querySelectorAll('.family-event')]
+      .find((el) => el.textContent.includes('Simskola'));
+    const top = event.getBoundingClientRect().top;
+    await card._refreshChangedEvents();
+    return event.isConnected && event === [...card.shadowRoot.querySelectorAll('.family-event')]
+      .find((el) => el.textContent.includes('Simskola')) &&
+      Math.abs(event.getBoundingClientRect().top - top) < 1;
+  });
+  expect(stable).toBe(true);
+  await page.evaluate(async () => {
+    eventData[0] = { ...eventData[0], summary: 'Updated swimming lesson' };
+    await card._refreshChangedEvents();
+  });
+  await expect(page.locator('.family-event').filter({ hasText: 'Updated swimming lesson' }).first()).toBeVisible();
+  await expect(page.locator('.family-event').filter({ hasText: 'Simskola' })).toHaveCount(0);
+});
+
 test('the main preview enables time-based spacing after selecting Week', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Week', exact: true }).click();

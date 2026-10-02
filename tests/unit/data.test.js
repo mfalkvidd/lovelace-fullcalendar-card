@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CalendarService, calendarEvent, calendarName } from "../../src/data.js";
+import { CalendarService, calendarEvent, calendarName, eventSignature } from "../../src/data.js";
 
 test("HA all-day semantics and exclusive end are preserved", () => {
   assert.deepEqual(calendarEvent({ summary: "Holiday", start: { date: "2026-09-17" }, end: { date: "2026-09-20" } }, "Home"), {
@@ -44,4 +44,12 @@ test("timestamp and time-list sensors remain supported; unavailable dates are om
   state.state = "unavailable";
   assert.deepEqual(await service.getEvents(hass, config), []);
   assert.deepEqual(await service.getEvents(hass, { entity: "sensor.missing" }), []);
+});
+
+test("refresh signature ignores response order but detects edits and duplicate changes", () => {
+  const a = calendarEvent({ summary: "Meeting", start: "2026-09-17", description: "First" }, "Home");
+  const b = calendarEvent({ summary: "Lunch", start: "2026-09-18" }, "Home");
+  assert.equal(eventSignature([a, b]), eventSignature([b, a]));
+  assert.notEqual(eventSignature([a, b]), eventSignature([a, b, b]));
+  assert.notEqual(eventSignature([a, b]), eventSignature([{ ...a, extendedProps: { ...a.extendedProps, description: "Changed" } }, b]));
 });

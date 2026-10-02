@@ -6,7 +6,7 @@ import listPlugin from "fullcalendar/list";
 import multiMonthPlugin from "fullcalendar/multimonth";
 import classicTheme from "fullcalendar/themes/classic";
 import locales from "fullcalendar/locales-all";
-import { CalendarService, calendarName } from "./data.js";
+import { CalendarService, calendarName, eventSignature } from "./data.js";
 import { normalizeConfig } from "./config.js";
 import { resolvePreferences, eventTimeFormat, formatEventDetails } from "./format.js";
 import { getLabels } from "./localize.js";
@@ -36,6 +36,7 @@ export class FullCalendarCard extends LitElement {
     this._errors = new Map();
     this._hiddenCalendars = new Set();
     this._sourceRequests = new Map();
+    this._sourceSnapshots = new Map();
     this._themeKeys = [];
     this._scheduleHeightUpdate = () => {
       if (this._heightFrame !== undefined) return;
@@ -60,6 +61,9 @@ export class FullCalendarCard extends LitElement {
     this._config = normalizeConfig(config);
     this._hiddenCalendars = new Set();
     this._sourceRequests.clear();
+    this._sourceSnapshots.clear();
+    this._pollRequest = undefined;
+    this._pollAgain = false;
     this._savedView = undefined;
     this._savedDate = undefined;
     this.renderRoot?.querySelector("dialog")?.close();
@@ -87,7 +91,7 @@ export class FullCalendarCard extends LitElement {
     this._scheduleHeightUpdate();
     // Calendar entities may change future events without changing their current state.
     this._refreshTimer = setInterval(() => {
-      if (!document.hidden) this.calendar?.refetchEvents();
+      if (!document.hidden) this._refreshChangedEvents();
     }, 60000);
   }
 
@@ -108,6 +112,9 @@ export class FullCalendarCard extends LitElement {
     this.calendar?.destroy();
     this.calendar = undefined;
     this._sourceRequests.clear();
+    this._sourceSnapshots.clear();
+    this._pollRequest = undefined;
+    this._pollAgain = false;
     this._selectedEvent = undefined;
   }
 
@@ -139,7 +146,7 @@ export class FullCalendarCard extends LitElement {
     if (changed.has("_hass") || changed.has("_config")) {
       const oldHass = changed.get("_hass");
       if (oldHass && this._config.entities.some(({ entity }) => oldHass.states?.[entity] !== this._hass.states?.[entity])) {
-        this.calendar.refetchEvents();
+        this._refreshChangedEvents();
       }
       this._applyTheme();
     }
@@ -149,10 +156,71 @@ export class FullCalendarCard extends LitElement {
     this._timeLayout?.schedule();
   }
 
+  async _refreshChangedEvents() {
+    if (!this.calendar || !this._config || !this._hass) return;
+    if (this._pollRequest) {
+      this._pollAgain = true;
+      return;
+    }
+    const request = Symbol();
+    this._pollRequest = request;
+    const calendar = this.calendar;
+    const config = this._config;
+    const hass = this._hass;
+    const targets = [...this._sourceSnapshots].filter(([index, snapshot]) =>
+      !this._hiddenCalendars.has(index) && this._sourceRequests.get(index) === snapshot.request);
+    try {
+      const results = await Promise.all(targets.map(async ([index, snapshot]) => {
+        try {
+          const events = await this._service.getEvents(hass, config.entities[index], snapshot.start, snapshot.end);
+          return { index, snapshot, signature: eventSignature(events) };
+        } catch (error) {
+          return { index, snapshot, error };
+        }
+      }));
+      if (!this.isConnected || this.calendar !== calendar || this._config !== config) return;
+      // If a state changed before its initial source load completed, retry it
+      // as the old direct refetch path did.
+      const changed = config.entities.flatMap((_, index) =>
+        !this._hiddenCalendars.has(index) && !this._sourceSnapshots.has(index) ? [index] : []);
+      for (const { index, snapshot, signature, error } of results) {
+        if (this._hiddenCalendars.has(index) || this._sourceSnapshots.get(index) !== snapshot ||
+            this._sourceRequests.get(index) !== snapshot.request) continue;
+        if (error) {
+          this._errors = new Map(this._errors).set(index, {
+            name: calendarName(this._hass, config.entities[index]), reason: error.message,
+          });
+        } else {
+          if (this._errors.has(index)) {
+            this._errors = new Map(this._errors);
+            this._errors.delete(index);
+          }
+          if (signature !== snapshot.signature) changed.push(index);
+        }
+      }
+      // FullCalendar replaces a source's event elements even when its data is
+      // identical. Avoid that redraw (and the visible time-layout jump).
+      calendar.batchRendering(() => {
+        for (const index of changed) {
+          calendar.getEventSourceById(`${config.entities[index].entity}-${index}`)?.refetch();
+        }
+      });
+    } finally {
+      if (this._pollRequest === request) {
+        this._pollRequest = undefined;
+        if (this._pollAgain) {
+          this._pollAgain = false;
+          this._refreshChangedEvents();
+        }
+      }
+    }
+  }
+
   _createCalendar() {
     const config = this._config;
     const preferences = this._preferences;
     this._sourceRequests.clear();
+    this._sourceSnapshots.clear();
     this.calendar = new Calendar(this.renderRoot.querySelector("#calendar"), {
       plugins: [classicTheme, dayGridPlugin, listPlugin, multiMonthPlugin],
       locales,
@@ -274,6 +342,7 @@ export class FullCalendarCard extends LitElement {
           try {
             const events = await this._service.getEvents(this._hass, entity, start, end);
             if (!isCurrent()) return [];
+            this._sourceSnapshots.set(index, { start, end, signature: eventSignature(events), request });
             if (this._errors.has(index)) {
               this._errors = new Map(this._errors);
               this._errors.delete(index);
@@ -281,6 +350,7 @@ export class FullCalendarCard extends LitElement {
             return events;
           } catch (error) {
             if (isCurrent()) {
+              this._sourceSnapshots.set(index, { start, end, signature: eventSignature([]), request });
               this._errors = new Map(this._errors).set(index, {
                 name: calendarName(this._hass, entity), reason: error.message,
               });
@@ -303,6 +373,7 @@ export class FullCalendarCard extends LitElement {
     this._errors = new Map(this._errors);
     this._errors.delete(index);
     this._sourceRequests.delete(index);
+    this._sourceSnapshots.delete(index);
     if (hidden.has(index) && this._selectedEvent?.source?.id === sourceId) {
       this.renderRoot.querySelector("dialog")?.close();
     }

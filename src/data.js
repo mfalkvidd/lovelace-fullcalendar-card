@@ -24,6 +24,12 @@ export function calendarEvent(data, name) {
   };
 }
 
+// Ignore API ordering changes while preserving duplicate events and every
+// field that can affect the rendered event or its details.
+export function eventSignature(events) {
+  return JSON.stringify(events.map((event) => JSON.stringify(event)).sort());
+}
+
 export class CalendarService {
   async getEvents(hass, config, start, end) {
     if (!hass) return [];
