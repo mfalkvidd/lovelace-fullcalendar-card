@@ -16,8 +16,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Verify distributed bundle matches source
-        run: git diff --exit-code -- lovelace-fullcalendar-card.js
+      - name: Verify the bundle was built
+        run: test -s lovelace-fullcalendar-card.js
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run test:browser
       - uses: actions/upload-artifact@v4

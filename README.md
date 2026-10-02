@@ -8,7 +8,7 @@ Targets **Home Assistant 2026.1 and later** with current Firefox and Chromium br
 
 ### HACS
 
-1. Open HACS and search for **Lovelace FullCalendar Card**. If it is not listed, add `https://github.com/gadgetchnnel/lovelace-fullcalendar-card` under **Custom repositories**, choosing **Dashboard** as the type.
+1. Install from a GitHub release that includes `lovelace-fullcalendar-card.js`. Open HACS and search for **Lovelace FullCalendar Card**. If it is not listed, add `https://github.com/gadgetchnnel/lovelace-fullcalendar-card` under **Custom repositories**, choosing **Dashboard** as the type.
 2. Download the card and reload the browser.
 3. Check **Settings → Dashboards → Resources** (enable Advanced Mode in your profile if needed). The resource should be `/hacsfiles/lovelace-fullcalendar-card/lovelace-fullcalendar-card.js`, type **JavaScript module**. Add it only if HACS has not registered it.
 4. Add a Manual card using one of the configurations below.
@@ -21,11 +21,11 @@ resources:
     type: module
 ```
 
-The root bundle and its filename are retained for [HACS Dashboard installation](https://www.hacs.xyz/docs/publish/plugin/).
+The generated bundle is not stored in Git. HACS installs the `lovelace-fullcalendar-card.js` asset from a GitHub release; a release with that asset must exist before installing through HACS. The default branch contains source code only.
 
 ### Manual installation
 
-Copy `lovelace-fullcalendar-card.js` to `/config/www/` and register `/local/lovelace-fullcalendar-card.js` as a JavaScript module resource. After replacing the file, change the version query on the existing resource URL (for example `/local/lovelace-fullcalendar-card.js?v=2`) and reload the dashboard so the browser loads the new bundle. Do not add a second resource entry or load both the manual and HACS resources.
+Download `lovelace-fullcalendar-card.js` from a GitHub release, or run `npm ci && npm run build` from a source checkout. Copy the bundle to `/config/www/` and register `/local/lovelace-fullcalendar-card.js` as a JavaScript module resource. After replacing the file, change the version query on the existing resource URL (for example `/local/lovelace-fullcalendar-card.js?v=2`) and reload the dashboard so the browser loads the new bundle. Do not add a second resource entry or load both the manual and HACS resources.
 
 ## Basic calendar
 
@@ -313,6 +313,6 @@ npx playwright install chromium firefox
 npm run test:browser
 ```
 
-`npm run watch` rebuilds on source changes. Always generate `lovelace-fullcalendar-card.js` from `src/`; never patch it manually. Keep the rebuilt root bundle with source changes. If publishing a GitHub release, attach that same bundle.
+`npm run watch` rebuilds on source changes. Always generate `lovelace-fullcalendar-card.js` from `src/`; never patch it manually. The bundle is ignored by Git and stays in the checkout for previews and manual installation. Publishing a GitHub release triggers the release workflow to build and attach the JS asset that HACS downloads. HACS cannot install from the source-only default branch.
 
 See [tests/README.md](tests/README.md) for the repeatable HA 2026.1.3 integration setup, browser matrix, and limits of validation.

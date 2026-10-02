@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 .test-ha/
 *.log
+/lovelace-fullcalendar-card.js
