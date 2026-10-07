@@ -13,6 +13,7 @@ import { getLabels } from "./localize.js";
 import { createWeekNumberCalculation } from "./week-numbers.js";
 import { styles } from "./styles.js";
 import { TimeBasedLayout, eventTimePlacement, timeBasedEventOrder } from "./time-layout.js";
+import "./clock.js";
 
 const previousPath = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
 const nextPath = "M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z";
@@ -445,9 +446,10 @@ export class FullCalendarCard extends LitElement {
             ${this._button(labels.today, () => this.calendar?.today())}
             ${this._navigationButton(labels.next, nextPath, () => this.calendar?.next(), "F16")}
           </div>
-          <h2 aria-live="polite">${this._title || labels.calendar}
+          <h2><span aria-live="polite">${this._title || labels.calendar}</span>
+            <fullcalendar-clock .preferences=${preferences}></fullcalendar-clock>
             ${this._config.weekNumbers && this._activeView === "dayGridWeek"
-              ? html`<span class="family-week-number-header">${this._weekTitle}</span>` : nothing}
+              ? html`<span class="family-week-number-header" aria-live="polite">${this._weekTitle}</span>` : nothing}
           </h2>
           <div class="views" role="group" aria-label=${labels.view}>
             ${this._config.views.map((view) => this._button(labels[view],

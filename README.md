@@ -42,6 +42,8 @@ To spread events through each day by start time, add `timeBasedLayout: true` to 
 
 Press **F15** for the previous period or **F16** for the next period in any view, without needing to focus the card. These shortcuts work like the navigation arrows: Day moves one day, Week and List one week, Two weeks two weeks, and Month and Two months one month. Shortcuts are ignored while typing in a field, while event details are open, or when combined with Shift, Ctrl, Alt, or Meta.
 
+The centered date heading also shows the current time, including seconds, in every view. The clock updates each second and follows the card's `hour12` setting and HA language/time-zone preferences, even when browsing other dates.
+
 ## Options
 
 | Option | Default | Description |
