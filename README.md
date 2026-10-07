@@ -40,6 +40,8 @@ Configure Google Calendar in Home Assistant first, then use its `calendar.*` ent
 
 To spread events through each day by start time, add `timeBasedLayout: true` to the card configuration. See [Time-based day layout](#time-based-day-layout) for the full example and placement rules.
 
+Press **F15** for the previous period or **F16** for the next period in any view, without needing to focus the card. These shortcuts work like the navigation arrows: Day moves one day, Week and List one week, Two weeks two weeks, and Month and Two months one month. Shortcuts are ignored while typing in a field, while event details are open, or when combined with Shift, Ctrl, Alt, or Meta.
+
 ## Options
 
 | Option | Default | Description |

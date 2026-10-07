@@ -38,6 +38,16 @@ export class FullCalendarCard extends LitElement {
     this._sourceRequests = new Map();
     this._sourceSnapshots = new Map();
     this._themeKeys = [];
+    this._handleNavigationKey = (event) => {
+      if (!this.calendar || event.defaultPrevented || event.altKey || event.ctrlKey ||
+          event.metaKey || event.shiftKey || !["F15", "F16"].includes(event.key)) return;
+      if (this.renderRoot.querySelector("dialog[open]") || event.composedPath().some((element) =>
+        element instanceof HTMLElement && (element.isContentEditable ||
+          element.matches("input, textarea, select, dialog[open], [role='textbox']")))) return;
+      event.preventDefault();
+      if (event.key === "F15") this.calendar.prev();
+      else this.calendar.next();
+    };
     this._scheduleHeightUpdate = () => {
       if (this._heightFrame !== undefined) return;
       this._heightFrame = requestAnimationFrame(() => {
@@ -85,6 +95,7 @@ export class FullCalendarCard extends LitElement {
       this._heightObserver.observe(element, { box: "border-box" });
     }
     window.addEventListener("resize", this._scheduleHeightUpdate);
+    window.addEventListener("keydown", this._handleNavigationKey);
     window.addEventListener("scroll", this._scheduleHeightUpdate, true);
     window.visualViewport?.addEventListener("resize", this._scheduleHeightUpdate);
     window.visualViewport?.addEventListener("scroll", this._scheduleHeightUpdate);
@@ -100,6 +111,7 @@ export class FullCalendarCard extends LitElement {
     clearInterval(this._refreshTimer);
     this._heightObserver?.disconnect();
     window.removeEventListener("resize", this._scheduleHeightUpdate);
+    window.removeEventListener("keydown", this._handleNavigationKey);
     window.removeEventListener("scroll", this._scheduleHeightUpdate, true);
     window.visualViewport?.removeEventListener("resize", this._scheduleHeightUpdate);
     window.visualViewport?.removeEventListener("scroll", this._scheduleHeightUpdate);
@@ -412,10 +424,10 @@ export class FullCalendarCard extends LitElement {
           @click=${action}>${label}</button>`;
   }
 
-  _navigationButton(label, path, action) {
+  _navigationButton(label, path, action, shortcut) {
     return customElements.get("ha-icon-button")
-      ? html`<ha-icon-button .path=${path} .label=${label} @click=${action}></ha-icon-button>`
-      : html`<button type="button" class="icon-button" aria-label=${label} @click=${action}>
+      ? html`<ha-icon-button .path=${path} .label=${label} aria-keyshortcuts=${shortcut} @click=${action}></ha-icon-button>`
+      : html`<button type="button" class="icon-button" aria-label=${label} aria-keyshortcuts=${shortcut} @click=${action}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d=${path}></path></svg>
         </button>`;
   }
@@ -429,9 +441,9 @@ export class FullCalendarCard extends LitElement {
       <ha-card>
         <header>
           <div class="navigation" aria-label=${labels.navigation}>
-            ${this._navigationButton(labels.previous, previousPath, () => this.calendar?.prev())}
+            ${this._navigationButton(labels.previous, previousPath, () => this.calendar?.prev(), "F15")}
             ${this._button(labels.today, () => this.calendar?.today())}
-            ${this._navigationButton(labels.next, nextPath, () => this.calendar?.next())}
+            ${this._navigationButton(labels.next, nextPath, () => this.calendar?.next(), "F16")}
           </div>
           <h2 aria-live="polite">${this._title || labels.calendar}
             ${this._config.weekNumbers && this._activeView === "dayGridWeek"

@@ -1,5 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+// Playwright's keyboard API does not recognize F15/F16. Dispatch their DOM
+// events from the focused element, including controls inside shadow roots.
+async function navigationKey(page, key, modifiers = {}) {
+  return page.evaluate(({ key, modifiers }) => {
+    let target = document.activeElement;
+    while (target?.shadowRoot?.activeElement) target = target.shadowRoot.activeElement;
+    const event = new KeyboardEvent("keydown", {
+      key, code: key, bubbles: true, composed: true, cancelable: true, ...modifiers,
+    });
+    (target || document.body).dispatchEvent(event);
+    return event.defaultPrevented;
+  }, { key, modifiers });
+}
+
 async function visibleEvent(page, title = "Simskola") {
   const event = page.locator(".family-event:visible").filter({ hasText: title }).first();
   if (!(await event.count())) {
@@ -33,6 +47,103 @@ test("navigation, fixed view selection, and readable events", async ({ page }) =
   await page.getByRole("button", { name: "Month", exact: true }).click();
   await expect(page.locator(".family-event .event-title").filter({ hasText: "Simskola" }).first()).toBeVisible();
   await page.screenshot({ path: "test-results/portrait-month.png" });
+});
+
+for (const [view, days, months] of [
+  ["dayGridDay", 1, 0], ["dayGridWeek", 7, 0], ["dayGridTwoWeeks", 14, 0],
+  ["dayGridMonth", 0, 1], ["multiMonthTwo", 0, 1], ["list", 7, 0],
+]) {
+  test(`${view}: F15/F16 navigate the active period across New Year`, async ({ page }) => {
+    await page.evaluate(async (view) => {
+      await mountCard({ views: [view], initialView: view, firstDay: 1, timeBasedLayout: true });
+      card.calendar.gotoDate("2026-12-31");
+    }, view);
+    const original = await page.evaluate(() => card.calendar.view.currentStart.toISOString());
+    const expected = await page.evaluate(({ original, days, months }) => {
+      const date = new Date(original);
+      if (months) date.setMonth(date.getMonth() + months);
+      else date.setDate(date.getDate() + days);
+      return date.toISOString();
+    }, { original, days, months });
+    await expect(page.getByRole("button", { name: "Previous", exact: true })).toHaveAttribute("aria-keyshortcuts", "F15");
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toHaveAttribute("aria-keyshortcuts", "F16");
+    expect(await navigationKey(page, "F16")).toBe(true);
+    expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(expected);
+    expect(await page.evaluate(() => card.calendar.view.type)).toBe(view);
+    expect(await navigationKey(page, "F15")).toBe(true);
+    expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
+    await navigationKey(page, "F15");
+    expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).not.toBe(original);
+    await navigationKey(page, "F16");
+    expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
+  });
+}
+
+test("F15/F16 respect fields, modifiers, prevented events and event details", async ({ page }) => {
+  const original = await page.evaluate(() => card.calendar.view.currentStart.toISOString());
+  for (const key of ["F15", "F16"]) {
+    for (const modifier of ["shiftKey", "ctrlKey", "altKey", "metaKey"]) {
+      expect(await navigationKey(page, key, { [modifier]: true })).toBe(false);
+      expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
+    }
+    for (const tag of ["input", "textarea", "select", "div"]) {
+      await page.evaluate((tag) => {
+        const host = document.createElement("div");
+        host.id = "shortcut-field";
+        const field = document.createElement(tag);
+        if (tag === "div") field.contentEditable = "true";
+        host.attachShadow({ mode: "open" }).append(field);
+        document.body.append(host);
+        field.focus();
+      }, tag);
+      expect(await navigationKey(page, key)).toBe(false);
+      expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
+      await page.evaluate(() => document.querySelector("#shortcut-field").remove());
+    }
+    expect(await page.evaluate((key) => {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      event.preventDefault();
+      document.dispatchEvent(event);
+      return card.calendar.view.currentStart.toISOString();
+    }, key)).toBe(original);
+  }
+  await (await visibleEvent(page)).click();
+  await expect(page.locator("dialog")).toBeVisible();
+  await navigationKey(page, "F16");
+  await navigationKey(page, "F15");
+  expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
+  await page.keyboard.press("Escape");
+  await navigationKey(page, "F16");
+  expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).not.toBe(original);
+});
+
+test("F15/F16 listeners are removed on disconnect and restored once on reconnect", async ({ page }) => {
+  const original = await page.evaluate(() => {
+    const start = card.calendar.view.currentStart.toISOString();
+    window.detachedCard = card;
+    card.remove();
+    window.detachedNavigation = [];
+    card.calendar = {
+      prev: () => detachedNavigation.push("prev"),
+      next: () => detachedNavigation.push("next"),
+    };
+    return start;
+  });
+  await navigationKey(page, "F15");
+  await navigationKey(page, "F16");
+  expect(await page.evaluate(() => detachedNavigation)).toEqual([]);
+  await page.evaluate(async () => {
+    detachedCard.calendar = undefined;
+    document.querySelector("#container").append(detachedCard);
+    await detachedCard.updateComplete;
+    window.navigationCalls = 0;
+    const next = card.calendar.next.bind(card.calendar);
+    card.calendar.next = () => { navigationCalls++; next(); };
+  });
+  await navigationKey(page, "F16");
+  expect(await page.evaluate(() => navigationCalls)).toBe(1);
+  await navigationKey(page, "F15");
+  expect(await page.evaluate(() => card.calendar.view.currentStart.toISOString())).toBe(original);
 });
 
 for (const [view, label, days, months] of [
